@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบหลังบ้านจัดการประปาหมู่บ้าน</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-blue-600 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+      <h1 class="text-xl font-bold">⚙️ ระบบหลังบ้าน (Admin Panel)</h1>
+      <div class="flex items-center gap-3">
+        <a href="index.html" class="bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded text-sm transition">🏠 ไปหน้าจดมิเตอร์</a>
+        <button id="btnLogout" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded text-sm transition">ออกจากระบบ</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    
+    <!-- Tab Navigation -->
+    <div class="flex border-b border-gray-300 mb-6">
+      <button onclick="switchTab('households')" id="tabHouseholdBtn" class="py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none">จัดการข้อมูลบ้าน</button>
+      <button onclick="switchTab('readings')" id="tabReadingBtn" class="py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none">ประวัติการจดมิเตอร์</button>
+    </div>
+
+    <!-- TAB 1: จัดการข้อมูลบ้าน -->
+    <section id="tabHouseholdContent" class="space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-700">รายชื่อบ้านเรือนและเลขมิเตอร์</h2>
+          <p class="text-sm text-gray-500">เพิ่มหรือแก้ไขข้อมูลบ้านสำหรับใช้จดมิเตอร์</p>
+        </div>
+        <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">+ เพิ่มบ้านใหม่</button>
+      </div>
+
+      <!-- ตารางแสดงรายชื่อบ้าน -->
+      <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+              <th class="p-3">บ้านเลขที่</th>
+              <th class="p-3">ชื่อเจ้าของบ้าน</th>
+              <th class="p-3">เลขมิเตอร์เดิม</th>
+              <th class="p-3">สถานะ</th>
+              <th class="p-3 text-center">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="householdTableBody" class="divide-y divide-gray-200 text-sm">
+            <tr><td colspan="5" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: ประวัติการจดมิเตอร์ -->
+    <section id="tabReadingContent" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-700">ประวัติการจดหน่วยน้ำประปา</h2>
+          <p class="text-sm text-gray-500">ตรวจสอบข้อมูลการจดมิเตอร์ย้อนหลังทั้งหมด</p>
+        </div>
+        <div>
+          <label class="text-sm text-gray-600 mr-2">เลือกงวดเดือน:</label>
+          <input type="month" id="filterMonth" class="border rounded px-3 py-1.5 text-sm" onchange="loadReadings()">
+        </div>
+      </div>
+
+      <!-- ตารางแสดงประวัติการจด -->
+      <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+              <th class="p-3">งวดเดือน</th>
+              <th class="p-3">บ้านเลขที่ / เจ้าของ</th>
+              <th class="p-3">เลขครั้งก่อน</th>
+              <th class="p-3">เลขครั้งนี้</th>
+              <th class="p-3">ใช้ไป (หน่วย)</th>
+              <th class="p-3">ยอดเงิน (บาท)</th>
+              <th class="p-3">ผู้จด</th>
+            </tr>
+          </thead>
+          <tbody id="readingTableBody" class="divide-y divide-gray-200 text-sm">
+            <tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal เพิ่ม/แก้ไข บ้าน -->
+  <div id="householdModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl space-y-4">
+      <h3 id="modalTitle" class="text-lg font-bold text-gray-800">เพิ่มบ้านใหม่</h3>
+      <input type="hidden" id="editHouseholdId">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">บ้านเลขที่</label>
+        <input type="text" id="houseNo" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="เช่น 123/4">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ - สกุล เจ้าของบ้าน</label>
+        <input type="text" id="ownerName" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="เช่น นายสมชาย ใจดี">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">เลขมิเตอร์ตั้งต้น (Initial Reading)</label>
+        <input type="number" id="initialReading" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="0">
+      </div>
+      <div class="flex justify-end gap-3 pt-4 border-t">
+        <button onclick="closeModal()" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm transition">ยกเลิก</button>
+        <button onclick="saveHousehold()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script เชื่อมต่อ Supabase และจัดการระบบ -->
+  <script>
+    // ⚙️ ตั้งค่าการเชื่อมต่อ Supabase (ใช้ค่าเดียวกับหน้า index.html)
+    const CONFIG = {
+      SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',
+      SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHlnZWVnYnhjZHJndGFhZnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMjQ5NDcsImV4cCI6MjEwODkwMDk0N30.kK-sZw_MB8DnH4YQUCUcmmLBL0fEGg2F0o9ke2tzkV0'
+    };
+
+    const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+    // ตรวจสอบสถานะล็อกอินเบื้องต้น
+    async function checkAuth() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        window.location.href = 'index.html';
+      }
+    }
+
+    // ออกจากระบบ
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+      await supabaseClient.auth.signOut();
+      window.location.href = 'index.html';
+    });
+
+    // สลับแท็บหน้าจอ
+    function switchTab(tab) {
+      if (tab === 'households') {
+        document.getElementById('tabHouseholdContent').classList.remove('hidden');
+        document.getElementById('tabReadingContent').classList.add('hidden');
+        document.getElementById('tabHouseholdBtn').className = "py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none";
+        document.getElementById('tabReadingBtn').className = "py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none";
+        loadHouseholds();
+      } else {
+        document.getElementById('tabHouseholdContent').classList.add('hidden');
+        document.getElementById('tabReadingContent').classList.remove('hidden');
+        document.getElementById('tabReadingBtn').className = "py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none";
+        document.getElementById('tabHouseholdBtn').className = "py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none";
+        loadReadings();
+      }
+    }
+
+    // โหลดข้อมูลบ้าน
+    async function loadHouseholds() {
+      const tbody = document.getElementById('householdTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>`;
+
+      const { data, error } = await supabaseClient
+        .from('households')
+        .select('*')
+        .order('house_no', { ascending: true });
+
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">ยังไม่มีข้อมูลบ้านในระบบ</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map(h => `
+        <tr class="hover:bg-gray-50">
+          <td class="p-3 font-medium">${h.house_no || '-'}</td>
+          <td class="p-3">${h.owner_name || '-'}</td>
+          <td class="p-3">${h.initial_reading || 0}</td>
+          <td class="p-3"><span class="px-2 py-1 text-xs rounded-full ${h.active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${h.active !== false ? 'ใช้งาน' : 'ระงับ'}</span></td>
+          <td class="p-3 text-center space-x-2">
+            <button onclick="openEditModal('${h.id}', '${h.house_no}', '${h.owner_name}', ${h.initial_reading})" class="text-blue-600 hover:underline text-sm font-medium">แก้ไข</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // โหลดประวัติการจดมิเตอร์
+    async function loadReadings() {
+      const tbody = document.getElementById('readingTableBody');
+      const monthFilter = document.getElementById('filterMonth').value;
+      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>`;
+
+      let query = supabaseClient
+        .from('readings')
+        .select(`*, households (house_no, owner_name)`)
+        .order('created_at', { ascending: false });
+
+      if (monthFilter) {
+        query = query.eq('billing_month', monthFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ไม่พบประวัติการจดมิเตอร์ในงวดนี้</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map(r => `
+        <tr class="hover:bg-gray-50">
+          <td class="p-3 text-sm">${r.billing_month}</td>
+          <td class="p-3 text-sm font-medium">${r.households?.house_no || ''} - ${r.households?.owner_name || ''}</td>
+          <td class="p-3 text-sm">${r.previous_reading}</td>
+          <td class="p-3 text-sm">${r.current_reading}</td>
+          <td class="p-3 text-sm text-blue-600 font-bold">${r.units_used}</td>
+          <td class="p-3 text-sm text-green-600 font-bold">฿${r.total_amount}</td>
+          <td class="p-3 text-xs text-gray-500">${r.staff_name || '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    // เปิด Modal เพิ่มบ้าน
+    function openAddModal() {
+      document.getElementById('modalTitle').innerText = 'เพิ่มบ้านใหม่';
+      document.getElementById('editHouseholdId').value = '';
+      document.getElementById('houseNo').value = '';
+      document.getElementById('ownerName').value = '';
+      document.getElementById('initialReading').value = '0';
+      document.getElementById('householdModal').classList.remove('hidden');
+    }
+
+    // เปิด Modal แก้ไขบ้าน
+    function openEditModal(id, houseNo, ownerName, initialReading) {
+      document.getElementById('modalTitle').innerText = 'แก้ไขข้อมูลบ้าน';
+      document.getElementById('editHouseholdId').value = id;
+      document.getElementById('houseNo').value = houseNo;
+      document.getElementById('ownerName').value = ownerName;
+      document.getElementById('initialReading').value = initialReading;
+      document.getElementById('householdModal').classList.remove('hidden');
+    }
+
+    // ปิด Modal
+    function closeModal() {
+      document.getElementById('householdModal').classList.add('hidden');
+    }
+
+    // บันทึกข้อมูลบ้าน (เพิ่มหรืออัปเดต)
+    async function saveHousehold() {
+      const id = document.getElementById('editHouseholdId').value;
+      const house_no = document.getElementById('houseNo').value.trim();
+      const owner_name = document.getElementById('ownerName').value.trim();
+      const initial_reading = parseFloat(document.getElementById('initialReading').value) || 0;
+
+      if (!house_no || !owner_name) {
+        alert('กรุณากรอกข้อมูลบ้านเลขที่และชื่อเจ้าของให้ครบถ้วน');
+        return;
+      }
+
+      if (id) {
+        // อัปเดตข้อมูลเดิม
+        const { error } = await supabaseClient
+          .from('households')
+          .update({ house_no, owner_name, initial_reading })
+          .eq('id', id);
+
+        if (error) {
+          alert('เกิดข้อผิดพลาด: ' + error.message);
+        } else {
+          closeModal();
+          loadHouseholds();
+        }
+      } else {
+        // เพิ่มข้อมูลใหม่
+        const { error } = await supabaseClient
+          .from('households')
+          .insert([{ house_no, owner_name, initial_reading, active: true }]);
+
+        if (error) {
+          alert('เกิดข้อผิดพลาด: ' + error.message);
+        } else {
+          closeModal();
+          loadHouseholds();
+        }
+      }
+    }
+
+    // ตั้งค่าช่องเดือนเริ่มต้นเป็นเดือนปัจจุบัน
+    const now = new Date();
+    const currentMonthStr = now.toISOString().slice(0, 7);
+    document.getElementById('filterMonth').value = currentMonthStr;
+
+    // เริ่มต้นทำงาน
+    checkAuth();
+    loadHouseholds();
+  </script>
+</body>
+</html>
