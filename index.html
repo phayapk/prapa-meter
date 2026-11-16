@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b6bcb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>จดมิเตอร์ประปา</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--pri:#0b6bcb;--ok:#1a8f4a;--warn:#d98200;--bad:#c62828;--bg:#eef3f8;--txt:#1d2733;--mut:#6b7785}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:"Sarabun","Noto Sans Thai",system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:17px}
+.hidden{display:none!important}
+header{position:sticky;top:0;z-index:10;background:var(--pri);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:6px}
+header h1{font-size:18px;margin:0;flex:1}
+.net{font-size:12px;padding:3px 8px;border-radius:12px;background:var(--ok)}
+.net.off{background:var(--bad)}.net.sync{background:var(--warn)}
+.hbtn{background:rgba(255,255,255,.2);color:#fff;border:0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit}
+.badge{background:var(--warn);color:#fff;border-radius:10px;padding:0 7px;font-size:12px;margin-left:4px}
+main{padding:12px;max-width:640px;margin:0 auto 60px}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.center{text-align:center}.mut{color:var(--mut)}.small{font-size:13px}
+.err{color:var(--bad);font-size:15px;min-height:1em}
+label{display:block;font-size:14px;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;border-radius:10px;background:#fff;font-family:inherit}
+.btn{display:block;width:100%;padding:15px;font-size:18px;font-family:inherit;border:0;border-radius:12px;background:var(--pri);color:#fff;margin-top:12px;font-weight:600}
+.btn.sec{background:#dfe6ee;color:var(--txt)}.btn.ok{background:var(--ok)}.btn:disabled{opacity:.5}
+.btn.small{width:auto;padding:12px 14px;font-size:15px;margin:0}
+.btn.huge{padding:22px;font-size:22px}
+.row{display:flex;gap:8px;align-items:flex-end}
+.prog{height:10px;background:#dfe6ee;border-radius:5px;overflow:hidden;margin:12px 0 6px}
+#progBar{height:100%;width:0;background:var(--ok);transition:width .3s}
+.tabs{display:flex;gap:6px;margin:10px 0}
+.tabs button{flex:1;padding:10px;border:0;border-radius:10px;background:#dfe6ee;font-size:15px;font-family:inherit}
+.tabs button.on{background:var(--pri);color:#fff}
+.item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.06);cursor:pointer}
+.item.q{cursor:default}
+.item .info{flex:1;min-width:0}
+.nm{font-weight:600}
+.ord{flex:0 0 42px;height:42px;border-radius:50%;background:#dfe6ee;display:flex;align-items:center;justify-content:center;font-weight:700}
+.item.done .ord{background:var(--ok);color:#fff}.item.pend .ord{background:var(--warn);color:#fff}
+.tag{font-size:13px;padding:3px 8px;border-radius:8px;white-space:nowrap}
+.tag.ok{background:#e1f4e8;color:var(--ok)}.tag.pend{background:#fff0d9;color:#a35f00}
+.back{background:none;border:0;color:var(--pri);font-size:17px;padding:6px 0 10px;font-family:inherit}
+.hname{font-size:22px;font-weight:700}
+.prev{margin-top:8px;font-size:18px}
+.photoBtn{display:block;text-align:center;padding:22px;border:2px dashed var(--pri);border-radius:14px;color:var(--pri);font-size:20px;font-weight:600;margin:0;cursor:pointer}
+.preview{width:100%;max-height:320px;object-fit:contain;border-radius:10px;margin-top:10px;background:#000}
+.numIn{font-size:40px;text-align:center;letter-spacing:6px;font-weight:700;padding:10px}
+.big{font-size:72px;font-weight:800;letter-spacing:6px;color:var(--pri);margin:6px 0;font-variant-numeric:tabular-nums;word-break:break-all}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.mid{font-size:30px;font-weight:700}
+.warn{background:#fff3e0;color:#8a4b00;border-radius:10px;padding:10px;margin:10px 0;font-weight:600}
+.thumb{width:64px;height:64px;object-fit:cover;border-radius:8px}
+.qnum{font-size:24px;font-weight:700;letter-spacing:2px}
+.del{background:#fde8e8;color:var(--bad);border:0;border-radius:8px;padding:8px 12px;font-family:inherit}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:12px 18px;border-radius:12px;z-index:50;max-width:90%;text-align:center}
+</style>
+</head>
+<body>
+
+<header id="topbar" class="hidden">
+  <h1>💧 จดมิเตอร์</h1>
+  <span id="net" class="net">ออนไลน์</span>
+  <button class="hbtn" id="btnQueue">รอส่ง<span id="qCount" class="badge hidden">0</span></button>
+  <button class="hbtn" id="btnLogout">ออก</button>
+</header>
+
+<main>
+  <!-- ===== หน้าล็อกอิน ===== -->
+  <section id="scrLogin" class="screen">
+    <div class="card" style="margin-top:40px">
+      <h2 class="center" style="margin-top:0">💧 ระบบจดมิเตอร์ประปา</h2>
+      <form id="loginForm">
+        <label>อีเมล</label>
+        <input type="email" id="email" autocomplete="username" required>
+        <label>รหัสผ่าน</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+        <button class="btn" id="btnLogin">เข้าสู่ระบบ</button>
+        <p id="loginErr" class="err"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===== หน้ารายชื่อบ้านตามเส้นทาง ===== -->
+  <section id="scrList" class="screen hidden">
+    <div class="card">
+      <div class="row">
+        <div style="flex:1"><label>งวดเดือน</label><input type="month" id="month"></div>
+        <button class="btn sec small" id="btnReload">↻ โหลดใหม่</button>
+      </div>
+      <div class="prog"><div id="progBar"></div></div>
+      <div id="progress" class="mut"></div>
+      <div id="cacheNote" class="mut small"></div>
+    </div>
+    <input type="search" id="search" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์">
+    <div class="tabs">
+      <button data-f="todo" class="on">ยังไม่จด</button>
+      <button data-f="all">ทั้งหมด</button>
+      <button data-f="done">จดแล้ว</button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <!-- ===== หน้าถ่ายรูป + กรอกเลข ===== -->
+  <section id="scrRead" class="screen hidden">
+    <button class="back" data-go="scrList">← กลับรายชื่อ</button>
+    <div class="card">
+      <div id="rName" class="hname"></div>
+      <div id="rInfo" class="mut"></div>
+      <div class="prev">เลขครั้งก่อน: <b id="rPrev"></b></div>
+    </div>
+    <div class="card">
+      <label class="photoBtn" for="photo" id="photoLabel">📷 ถ่ายรูปมิเตอร์</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" class="hidden">
+      <img id="preview" class="preview hidden" alt="">
+      <label>เลขที่อ่านได้บนมิเตอร์</label>
+      <input type="text" id="reading" inputmode="numeric" pattern="[0-9]*" class="numIn" autocomplete="off">
+      <label>สถานะมิเตอร์</label>
+      <select id="resetType">
+        <option value="">ปกติ</option>
+        <option value="rollover">มิเตอร์วนรอบ (เกินเลขสูงสุดแล้วกลับไปเริ่ม 0)</option>
+        <option value="new_meter">เปลี่ยนมิเตอร์ใหม่ (เริ่มนับจาก 0)</option>
+      </select>
+      <p id="readErr" class="err"></p>
+      <button class="btn" id="btnNext">ถัดไป: ตรวจสอบตัวเลข →</button>
+    </div>
+  </section>
+
+  <!-- ===== หน้ายืนยันตัวเลขใหญ่ ===== -->
+  <section id="scrConfirm" class="screen hidden">
+    <div class="card center">
+      <div class="mut">ตรวจสอบเลขมิเตอร์ให้ตรงกับรูป</div>
+      <div id="cName" class="hname"></div>
+      <div id="cBig" class="big"></div>
+      <div class="grid2">
+        <div><div class="mut small">เลขครั้งก่อน</div><div id="cPrev" class="mid"></div></div>
+        <div><div class="mut small">ใช้น้ำ (หน่วย)</div><div id="cUnits" class="mid"></div></div>
+      </div>
+      <div id="cType" class="mut"></div>
+      <div id="cWarn" class="warn hidden"></div>
+      <img id="cPhoto" class="preview hidden" alt="">
+    </div>
+    <button class="btn ok huge" id="btnSave">✓ ถูกต้อง บันทึก</button>
+    <button class="btn sec" data-go="scrRead">✗ ไม่ถูก กลับไปแก้</button>
+  </section>
+
+  <!-- ===== หน้ารอส่ง (ออฟไลน์) ===== -->
+  <section id="scrQueue" class="screen hidden">
+    <button class="back" data-go="scrList">← กลับรายชื่อ</button>
+    <div class="card">
+      <h3 style="margin:0">รายการรอส่งขึ้นระบบ</h3>
+      <p class="mut small">ข้อมูลเก็บอยู่ในเครื่องนี้ ระบบจะส่งให้อัตโนมัติเมื่อมีสัญญาณ ห้ามล้างข้อมูลเบราว์เซอร์จนกว่าจะส่งครบ</p>
+      <button class="btn" id="btnSync">⇪ ส่งทั้งหมดตอนนี้</button>
+    </div>
+    <div id="qList"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ================== ตั้งค่า (แก้ตรงนี้) ==================
+const CONFIG = {
+  SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',     // Project URL
+  SUPABASE_KEY: 'sb_publishable_9xny6T2j2-4io9_LAgqUSQ_5YOcWN3s',  // ห้ามใช้ service_role
+  PHOTO_BUCKET: 'meter-photos',
+  REQUIRE_PHOTO: true,     // บังคับถ่ายรูปก่อนบันทึก
+  HIGH_USAGE_WARN: 100     // เตือนถ้าใช้น้ำเกินกี่หน่วย
+};
+// =======================================================
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+if (!window.supabase) {
+  document.body.innerHTML = '<p style="padding:20px">โหลดระบบไม่สำเร็จ กรุณาต่ออินเทอร์เน็ตแล้วเปิดใหม่</p>';
+  throw new Error('supabase-js not loaded');
+}
+const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+const S = { month:'', households:[], map:{}, queue:[], filter:'todo', cur:null, photo:null, photoUrl:null, pending:null, syncing:false };
+const TYPE_TXT = { '':'ปกติ', rollover:'มิเตอร์วนรอบ', new_meter:'เปลี่ยนมิเตอร์ใหม่' };
+
+// ---------- ฐานข้อมูลในเครื่อง (IndexedDB) สำหรับคิวออฟไลน์ ----------
+const DB = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open('meterApp', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('queue', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('queue', mode);
+      const req = fn(t.objectStore('queue'));
+      t.oncomplete = () => res(req.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    put: item => tx('readwrite', st => st.put(item)),
+    del: id => tx('readwrite', st => st.delete(id)),
+    all: () => tx('readonly', st => st.getAll())
+  };
+})();
+
+// ---------- ตัวช่วย ----------
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('hidden', s.id !== id));
+  $('#topbar').classList.toggle('hidden', id === 'scrLogin');
+  window.scrollTo(0, 0);
+}
+let toastTimer;
+function toast(msg, ms = 2800) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), ms);
+}
+const fmt = (n, d) => String(n ?? 0).padStart(d || 4, '0');
+const period = () => S.month + '-01';
+function bkkMonth() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+}
+function shiftMonth(ym, n) {
+  let [y, m] = ym.split('-').map(Number); m += n;
+  while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; }
+  return `${y}-${String(m).padStart(2, '0')}`;
+}
+function calcUnits(prev, curr, type, digits) {
+  if (type === 'new_meter') return curr;
+  if (type === 'rollover') return curr + 10 ** digits - prev;
+  return curr - prev;
+}
+async function fetchAll(build) {
+  let out = [], from = 0; const size = 1000;
+  while (true) {
+    const { data, error } = await build().range(from, from + size - 1);
+    if (error) throw error;
+    out = out.concat(data);
+    if (data.length < size) break;
+    from += size;
+  }
+  return out;
+}
+async function compress(file, max = 1280, q = 0.7) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const s = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+  } finally { URL.revokeObjectURL(url); }
+}
+function updateNet() {
+  const on = navigator.onLine, n = $('#net');
+  n.textContent = S.syncing ? 'กำลังส่ง...' : on ? 'ออนไลน์' : 'ออฟไลน์';
+  n.className = 'net' + (on ? '' : ' off') + (S.syncing ? ' sync' : '');
+}
+
+// ---------- โหลดรายชื่อบ้าน + เลขครั้งก่อน ----------
+async function loadData() {
+  $('#progress').textContent = 'กำลังโหลด...';
+  try {
+    const hh = await fetchAll(() => sb.from('households')
+      .select('id,house_no,owner_name,meter_no,meter_digits,initial_reading,route_order')
+      .order('route_order', { ascending: true, nullsFirst: false })
+      .order('owner_name').order('id'));
+    const from = shiftMonth(S.month, -13) + '-01';
+    const rd = await fetchAll(() => sb.from('readings')
+      .select('household_id,period,curr_reading')
+      .gte('period', from).lte('period', period())
+      .order('period', { ascending: false }).order('household_id'));
+    const map = {};
+    hh.forEach(h => map[h.id] = { prev: h.initial_reading ?? 0, prevPeriod: null, done: null });
+    rd.forEach(r => {
+      const m = map[r.household_id]; if (!m) return;
+      if (r.period === period()) m.done = r.curr_reading;
+      else if (!m.prevPeriod) { m.prev = r.curr_reading; m.prevPeriod = r.period; }
+    });
+    S.households = hh; S.map = map; saveCache();
+    $('#cacheNote').textContent = '';
+  } catch (e) {
+    const c = JSON.parse(localStorage.getItem('cache_' + S.month) || 'null');
+    if (c) {
+      S.households = c.hh; S.map = c.map;
+      $('#cacheNote').textContent = `⚠ ออฟไลน์: ใช้ข้อมูลที่โหลดไว้เมื่อ ${new Date(c.at).toLocaleString('th-TH')}`;
+    } else {
+      S.households = []; S.map = {};
+      $('#cacheNote').textContent = '⚠ โหลดข้อมูลไม่ได้: ' + e.message;
+    }
+  }
+  renderList();
+}
+function saveCache() {
+  if (S.households.length)
+    localStorage.setItem('cache_' + S.month, JSON.stringify({ hh: S.households, map: S.map, at: Date.now() }));
+}
+
+// ---------- หน้ารายชื่อ ----------
+function statusOf(h) {
+  if ((S.map[h.id] || {}).done != null) return 'done';
+  if (S.queue.some(q => q.householdId === h.id && q.period === period())) return 'pend';
+  return 'todo';
+}
+function renderList() {
+  const q = $('#search').value.trim().toLowerCase();
+  let nDone = 0; const rows = [];
+  S.households.forEach(h => {
+    const st = statusOf(h); if (st !== 'todo') nDone++;
+    if (S.filter === 'todo' && st !== 'todo') return;
+    if (S.filter === 'done' && st === 'todo') return;
+    if (q && !`${h.owner_name} ${h.house_no || ''} ${h.meter_no || ''}`.toLowerCase().includes(q)) return;
+    const m = S.map[h.id] || {};
+    const tag = st === 'done' ? `<span class="tag ok">✓ ${esc(m.done)}</span>`
+              : st === 'pend' ? '<span class="tag pend">⏳ รอส่ง</span>' : '';
+    rows.push(`<div class="item ${st}" data-id="${esc(h.id)}">
+      <div class="ord">${esc(h.route_order ?? '–')}</div>
+      <div class="info"><div class="nm">${esc(h.owner_name)}</div>
+      <div class="mut small">บ้าน ${esc(h.house_no || 'ยังไม่ระบุ')} · มิเตอร์ ${esc(h.meter_no || '-')}</div></div>${tag}</div>`);
+  });
+  const total = S.households.length;
+  $('#progress').textContent = `จดแล้ว ${nDone} / ${total} หลัง`;
+  $('#progBar').style.width = total ? (nDone / total * 100) + '%' : '0';
+  $('#list').innerHTML = rows.join('') || '<p class="mut center">ไม่มีรายการ</p>';
+}
+
+// ---------- หน้าถ่ายรูป / กรอกเลข ----------
+function openReading(id) {
+  const h = S.households.find(x => String(x.id) === id); if (!h) return;
+  const st = statusOf(h);
+  if (st === 'done') return toast('บ้านนี้จดงวดนี้แล้ว หากต้องแก้ไขให้แจ้งผู้ดูแลระบบ', 3500);
+  if (st === 'pend') return toast('บ้านนี้บันทึกไว้แล้ว กำลังรอส่ง (ดูที่ปุ่ม "รอส่ง")', 3500);
+  S.cur = h; S.photo = null;
+  if (S.photoUrl) URL.revokeObjectURL(S.photoUrl); S.photoUrl = null;
+  const m = S.map[h.id] || {};
+  $('#rName').textContent = h.owner_name;
+  $('#rInfo').textContent = `บ้านเลขที่ ${h.house_no || 'ยังไม่ระบุ'} · มิเตอร์ ${h.meter_no || '-'} · ${h.meter_digits || 4} หลัก`;
+  $('#rPrev').textContent = fmt(m.prev, h.meter_digits) + (m.prevPeriod ? '' : ' (เลขเริ่มต้น)');
+  $('#reading').value = ''; $('#reading').maxLength = h.meter_digits || 4;
+  $('#resetType').value = ''; $('#readErr').textContent = '';
+  $('#preview').classList.add('hidden'); $('#photo').value = '';
+  $('#photoLabel').textContent = '📷 ถ่ายรูปมิเตอร์';
+  show('scrRead');
+}
+$('#photo').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('#photoLabel').textContent = 'กำลังย่อรูป...';
+  try { S.photo = await compress(f); } catch { S.photo = f; }
+  if (S.photoUrl) URL.revokeObjectURL(S.photoUrl);
+  S.photoUrl = URL.createObjectURL(S.photo);
+  $('#preview').src = S.photoUrl; $('#preview').classList.remove('hidden');
+  $('#photoLabel').textContent = '📷 ถ่ายใหม่';
+});
+$('#btnNext').addEventListener('click', () => {
+  const h = S.cur, m = S.map[h.id] || {};
+  const raw = $('#reading').value.trim(), type = $('#resetType').value;
+  const digits = h.meter_digits || 4, prev = Number(m.prev ?? 0);
+  const err = t => { $('#readErr').textContent = t; };
+  if (CONFIG.REQUIRE_PHOTO && !S.photo) return err('กรุณาถ่ายรูปมิเตอร์ก่อน');
+  if (!/^\d+$/.test(raw)) return err('กรุณากรอกเฉพาะตัวเลข');
+  const curr = parseInt(raw, 10);
+  if (curr >= 10 ** digits) return err(`เลขเกิน ${digits} หลัก`);
+  if (!type && curr < prev) return err(`เลขใหม่ (${curr}) น้อยกว่าครั้งก่อน (${prev}) ถ้ามิเตอร์วนรอบหรือเปลี่ยนมิเตอร์ใหม่ ให้เลือก "สถานะมิเตอร์" ให้ถูกต้อง`);
+  const units = calcUnits(prev, curr, type, digits);
+  S.pending = { curr, type, units };
+
+  $('#cName').textContent = `${h.owner_name} · บ้าน ${h.house_no || '-'}`;
+  $('#cBig').textContent = fmt(curr, digits);
+  $('#cPrev').textContent = fmt(prev, digits);
+  $('#cUnits').textContent = units;
+  $('#cType').textContent = 'สถานะมิเตอร์: ' + TYPE_TXT[type];
+  const w = [];
+  if (units > CONFIG.HIGH_USAGE_WARN) w.push(`⚠ ใช้น้ำ ${units} หน่วย สูงผิดปกติ กรุณาตรวจเลขอีกครั้ง`);
+  if (units === 0) w.push('⚠ ใช้น้ำ 0 หน่วย (บ้านว่างหรือไม่มีคนอยู่?)');
+  if (type === 'rollover' && curr >= prev) w.push('⚠ เลือก "วนรอบ" แต่เลขใหม่ไม่ได้น้อยกว่าเลขเดิม ตรวจสอบอีกครั้ง');
+  $('#cWarn').innerHTML = w.map(esc).join('<br>');
+  $('#cWarn').classList.toggle('hidden', !w.length);
+  $('#cPhoto').classList.toggle('hidden', !S.photoUrl);
+  if (S.photoUrl) $('#cPhoto').src = S.photoUrl;
+  show('scrConfirm');
+});
+
+// ---------- บันทึก (ลงเครื่องก่อนเสมอ แล้วค่อยส่ง) ----------
+$('#btnSave').addEventListener('click', async () => {
+  const b = $('#btnSave'); b.disabled = true;
+  try {
+    const h = S.cur, p = S.pending;
+    await DB.put({
+      id: crypto.randomUUID(), householdId: h.id, period: period(),
+      reading: p.curr, resetType: p.type || null,
+      photo: S.photo ? await S.photo.arrayBuffer() : null,
+      takenAt: new Date().toISOString(),
+      label: `${h.owner_name} (บ้าน ${h.house_no || '-'})`, error: null
+    });
+    await refreshQueue();
+    toast('✓ บันทึกในเครื่องแล้ว' + (navigator.onLine ? ' กำลังส่ง...' : ' (จะส่งเมื่อมีสัญญาณ)'));
+    show('scrList'); renderList();
+    syncNow();
+  } catch (e) { alert('บันทึกไม่สำเร็จ: ' + e.message); }
+  finally { b.disabled = false; }
+});
+
+// ---------- ส่งคิวขึ้น Supabase ----------
+async function syncNow(manual) {
+  if (S.syncing) return;
+  if (!navigator.onLine) { if (manual) toast('ยังไม่มีสัญญาณอินเทอร์เน็ต'); return; }
+  const { data } = await sb.auth.getSession();
+  if (!data.session) { if (manual) toast('กรุณาเข้าสู่ระบบก่อน'); return; }
+  S.syncing = true; updateNet();
+  let ok = 0, fail = 0;
+  try {
+    for (const it of await DB.all()) {
+      try {
+        let photo_path = null;
+        if (it.photo) {
+          photo_path = `${it.period}/${it.householdId}_${Date.parse(it.takenAt)}.jpg`;
+          const { error } = await sb.storage.from(CONFIG.PHOTO_BUCKET)
+            .upload(photo_path, new Blob([it.photo], { type: 'image/jpeg' }), { contentType: 'image/jpeg' });
+          if (error && !(/exist|duplicate/i.test(error.message) || String(error.statusCode) === '409')) throw error;
+        }
+        const { error } = await sb.from('readings').insert({
+          household_id: it.householdId, period: it.period, curr_reading: it.reading,
+          reset_type: it.resetType, photo_path, taken_at: it.takenAt
+        });
+        if (error && error.code !== '23505') throw error;
+        await DB.del(it.id); ok++;
+        if (it.period === period() && S.map[it.householdId]) S.map[it.householdId].done = it.reading;
+      } catch (e) {
+        it.error = e.message || String(e); await DB.put(it); fail++;
+      }
+    }
+  } finally {
+    S.syncing = false; updateNet();
+    await refreshQueue(); saveCache(); renderList();
+  }
+  if (ok) toast(`✓ ส่งขึ้นระบบสำเร็จ ${ok} รายการ`);
+  if (fail) toast(`⚠ ส่งไม่สำเร็จ ${fail} รายการ ดูรายละเอียดที่ "รอส่ง"`, 4000);
+}
+
+// ---------- หน้ารอส่ง ----------
+let qUrls = [];
+async function refreshQueue() {
+  S.queue = await DB.all();
+  $('#qCount').textContent = S.queue.length;
+  $('#qCount').classList.toggle('hidden', !S.queue.length);
+  renderQueue();
+}
+function renderQueue() {
+  qUrls.forEach(u => URL.revokeObjectURL(u)); qUrls = [];
+  if (!S.queue.length) { $('#qList').innerHTML = '<p class="mut center">✓ ไม่มีรายการค้างส่ง</p>'; return; }
+  $('#qList').innerHTML = [...S.queue].sort((a, b) => a.takenAt.localeCompare(b.takenAt)).map(it => {
+    let img = '';
+    if (it.photo) {
+      const u = URL.createObjectURL(new Blob([it.photo], { type: 'image/jpeg' }));
+      qUrls.push(u); img = `<img src="${u}" class="thumb" alt="">`;
+    }
+    return `<div class="item q">${img}<div class="info">
+      <div class="nm">${esc(it.label)}</div>
+      <div class="mut small">งวด ${esc(it.period.slice(0, 7))} · ${new Date(it.takenAt).toLocaleString('th-TH')}</div>
+      <div class="qnum">${esc(it.reading)}</div>
+      ${it.error ? `<div class="err small">ส่งไม่สำเร็จ: ${esc(it.error)}</div>` : ''}
+      </div><button class="del" data-del="${esc(it.id)}">ลบ</button></div>`;
+  }).join('');
+}
+
+// ---------- ปุ่มและเหตุการณ์ต่าง ๆ ----------
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (g) show(g.dataset.go);
+});
+$('#list').addEventListener('click', e => {
+  const it = e.target.closest('.item'); if (it) openReading(it.dataset.id);
+});
+$('#qList').addEventListener('click', async e => {
+  const d = e.target.closest('[data-del]'); if (!d) return;
+  if (!confirm('ลบรายการนี้? ข้อมูลที่ยังไม่ได้ส่งจะหายไปถาวร')) return;
+  await DB.del(d.dataset.del); await refreshQueue(); renderList();
+});
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  S.filter = b.dataset.f; renderList();
+}));
+$('#search').addEventListener('input', renderList);
+$('#month').addEventListener('change', e => { if (e.target.value) { S.month = e.target.value; loadData(); } });
+$('#btnReload').addEventListener('click', loadData);
+$('#btnQueue').addEventListener('click', () => { renderQueue(); show('scrQueue'); });
+$('#btnSync').addEventListener('click', () => syncNow(true));
+$('#btnLogout').addEventListener('click', async () => {
+  if (S.queue.length && !confirm(`ยังมี ${S.queue.length} รายการที่ยังไม่ได้ส่ง (ข้อมูลยังอยู่ในเครื่อง) ต้องการออกจากระบบไหม?`)) return;
+  try { await sb.auth.signOut(); } catch {}
+  show('scrLogin');
+});
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const b = $('#btnLogin'); b.disabled = true; $('#loginErr').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
+  b.disabled = false;
+  if (error) {
+    $('#loginErr').textContent = /invalid/i.test(error.message) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message;
+    return;
+  }
+  $('#password').value = '';
+  start();
+});
+window.addEventListener('online', () => { updateNet(); syncNow(); });
+window.addEventListener('offline', updateNet);
+setInterval(() => { if (S.queue.length) syncNow(); }, 60000);
+
+// ---------- เริ่มทำงาน ----------
+async function start() {
+  show('scrList');
+  if (!S.month) { S.month = bkkMonth(); $('#month').value = S.month; }
+  updateNet(); await refreshQueue(); await loadData(); syncNow();
+}
+(async () => {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage?.persist) navigator.storage.persist();
+  updateNet();
+  const { data } = await sb.auth.getSession();
+  if (data.session) start(); else show('scrLogin');
+})();
+</script>
+</body>
+</html>
