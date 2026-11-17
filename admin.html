@@ -1,312 +1,740 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบหลังบ้านจัดการประปาหมู่บ้าน</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-  <!-- Supabase JS Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>หลังบ้าน | ระบบประปาหมู่บ้าน</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body{font-family:'Sarabun','Noto Sans Thai',system-ui,sans-serif}
+  .tab{padding:.6rem 1rem;font-weight:600;color:#6b7280;border-bottom:2px solid transparent;white-space:nowrap}
+  .tab.active{color:#2563eb;border-color:#2563eb}
+  .card{background:#fff;border-radius:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:1.25rem}
+  .card-t{background:#fff;border-radius:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow-x:auto}
+  .inp{border:1px solid #d1d5db;border-radius:.5rem;padding:.5rem .75rem;width:100%;background:#fff}
+  .btn{padding:.5rem 1rem;border-radius:.5rem;font-weight:600;font-size:.875rem;cursor:pointer}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:.75rem;color:#6b7280;text-align:left;padding:.75rem;background:#f9fafb;white-space:nowrap}
+  td{padding:.6rem .75rem;border-top:1px solid #f1f5f9;font-size:.875rem;vertical-align:top}
+  @media print{.no-print{display:none!important} body{background:#fff}}
+</style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen">
+<body class="bg-gray-100 text-gray-800 min-h-screen">
 
-  <!-- Header -->
-  <header class="bg-blue-600 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-      <h1 class="text-xl font-bold">⚙️ ระบบหลังบ้าน (Admin Panel)</h1>
-      <div class="flex items-center gap-3">
-        <a href="index.html" class="bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded text-sm transition">🏠 ไปหน้าจดมิเตอร์</a>
-        <button id="btnLogout" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded text-sm transition">ออกจากระบบ</button>
+<!-- ===== หน้าเข้าสู่ระบบ ===== -->
+<div id="viewLogin" class="hidden">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <form id="loginForm" class="card w-full max-w-sm space-y-3">
+      <h1 class="text-xl font-bold text-center">⚙️ เข้าสู่ระบบหลังบ้าน</h1>
+      <input id="loginEmail" type="email" class="inp" placeholder="อีเมล" required>
+      <input id="loginPass" type="password" class="inp" placeholder="รหัสผ่าน" required>
+      <button class="btn bg-blue-600 text-white w-full">เข้าสู่ระบบ</button>
+      <p id="loginMsg" class="text-sm text-red-600 text-center"></p>
+      <a href="index.html" class="block text-center text-sm text-blue-600">← ไปหน้าจดมิเตอร์</a>
+    </form>
+  </div>
+</div>
+
+<!-- ===== ไม่มีสิทธิ์ ===== -->
+<div id="viewDenied" class="hidden">
+  <div class="min-h-screen flex items-center justify-center p-4">
+    <div class="card max-w-sm text-center space-y-3">
+      <p class="text-4xl">🔒</p>
+      <h1 class="text-lg font-bold">บัญชีนี้ไม่มีสิทธิ์แอดมิน</h1>
+      <p id="deniedMsg" class="text-sm text-gray-500">กรุณาติดต่อผู้ดูแลระบบ</p>
+      <div class="flex gap-2 justify-center">
+        <a href="index.html" class="btn bg-blue-600 text-white">ไปหน้าจดมิเตอร์</a>
+        <button onclick="logout()" class="btn bg-gray-200">ออกจากระบบ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== แอปหลัก ===== -->
+<div id="viewApp" class="hidden">
+  <header class="bg-blue-600 text-white shadow no-print">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap gap-2 justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold">⚙️ หลังบ้าน <span id="villageName" class="font-normal"></span></h1>
+        <p id="whoami" class="text-xs text-blue-100"></p>
+      </div>
+      <div class="flex gap-2">
+        <a href="index.html" class="btn bg-white/20 hover:bg-white/30">📱 หน้าจดมิเตอร์</a>
+        <button onclick="logout()" class="btn bg-red-500 hover:bg-red-600">ออกจากระบบ</button>
       </div>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="max-w-6xl mx-auto px-4 py-6">
-    
-    <!-- Tab Navigation -->
-    <div class="flex border-b border-gray-300 mb-6">
-      <button onclick="switchTab('households')" id="tabHouseholdBtn" class="py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none">จัดการข้อมูลบ้าน</button>
-      <button onclick="switchTab('readings')" id="tabReadingBtn" class="py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none">ประวัติการจดมิเตอร์</button>
+  <main class="max-w-6xl mx-auto px-4 py-4 space-y-4">
+    <nav class="flex overflow-x-auto border-b border-gray-300 no-print">
+      <button class="tab active" data-tab="dash">📊 ภาพรวม</button>
+      <button class="tab" data-tab="house">🏠 ข้อมูลบ้าน</button>
+      <button class="tab" data-tab="read">📋 ผลการจด/ค่าน้ำ</button>
+      <button class="tab" data-tab="rate">💰 อัตราค่าน้ำ</button>
+      <button class="tab" data-tab="user">👥 ผู้ใช้งาน</button>
+    </nav>
+
+    <div id="monthBar" class="flex flex-wrap items-center gap-2 no-print">
+      <label class="text-sm text-gray-600">งวดเดือน</label>
+      <input type="month" id="month" class="inp" style="width:auto">
+      <button onclick="reloadAll()" class="btn bg-gray-200 hover:bg-gray-300">↻ โหลดใหม่</button>
+      <span id="loadMsg" class="text-sm text-gray-500"></span>
     </div>
 
-    <!-- TAB 1: จัดการข้อมูลบ้าน -->
-    <section id="tabHouseholdContent" class="space-y-6">
-      <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h2 class="text-lg font-bold text-gray-700">รายชื่อบ้านเรือนและเลขมิเตอร์</h2>
-          <p class="text-sm text-gray-500">เพิ่มหรือแก้ไขข้อมูลบ้านสำหรับใช้จดมิเตอร์</p>
+    <!-- TAB: ภาพรวม -->
+    <section id="tab-dash" class="space-y-4">
+      <div id="kpis" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"></div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card">
+          <h3 class="font-bold mb-2">⏳ บ้านที่ยังไม่จด (<span id="pendingCount">0</span>)</h3>
+          <div id="pendingList" class="max-h-96 overflow-auto text-sm divide-y"></div>
         </div>
-        <button onclick="openAddModal()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">+ เพิ่มบ้านใหม่</button>
+        <div class="card">
+          <h3 class="font-bold mb-2">⚠️ รายการผิดปกติ (<span id="anomalyCount">0</span>)</h3>
+          <div id="anomalyList" class="max-h-96 overflow-auto text-sm divide-y"></div>
+        </div>
       </div>
+    </section>
 
-      <!-- ตารางแสดงรายชื่อบ้าน -->
-      <div class="bg-white rounded-lg shadow-md overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
-              <th class="p-3">บ้านเลขที่</th>
-              <th class="p-3">ชื่อเจ้าของบ้าน</th>
-              <th class="p-3">เลขมิเตอร์เดิม</th>
-              <th class="p-3">สถานะ</th>
-              <th class="p-3 text-center">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody id="householdTableBody" class="divide-y divide-gray-200 text-sm">
-            <tr><td colspan="5" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>
-          </tbody>
+    <!-- TAB: ข้อมูลบ้าน -->
+    <section id="tab-house" class="hidden space-y-4">
+      <div class="card flex flex-wrap gap-2 items-center">
+        <input id="houseSearch" class="inp" style="flex:1;min-width:200px" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์">
+        <select id="houseFilter" class="inp" style="width:auto">
+          <option value="all">ทั้งหมด</option>
+          <option value="active">ใช้งาน</option>
+          <option value="inactive">ระงับ</option>
+          <option value="noHouseNo">ยังไม่มีบ้านเลขที่</option>
+        </select>
+        <button onclick="openHouse()" class="btn bg-green-600 hover:bg-green-700 text-white">+ เพิ่มบ้าน</button>
+        <button onclick="exportHouses()" class="btn bg-gray-200 hover:bg-gray-300">⬇️ CSV</button>
+      </div>
+      <p id="houseCount" class="text-sm text-gray-500"></p>
+      <div class="card-t">
+        <table>
+          <thead><tr>
+            <th>บ้านเลขที่</th><th>ชื่อเจ้าของ</th><th id="thMeterNo">เลขมิเตอร์</th>
+            <th>เลขตั้งต้น</th><th>จดล่าสุด</th><th>สถานะ</th><th style="text-align:center">จัดการ</th>
+          </tr></thead>
+          <tbody id="houseBody"></tbody>
         </table>
       </div>
     </section>
 
-    <!-- TAB 2: ประวัติการจดมิเตอร์ -->
-    <section id="tabReadingContent" class="hidden space-y-6">
-      <div class="bg-white p-6 rounded-lg shadow-md flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h2 class="text-lg font-bold text-gray-700">ประวัติการจดหน่วยน้ำประปา</h2>
-          <p class="text-sm text-gray-500">ตรวจสอบข้อมูลการจดมิเตอร์ย้อนหลังทั้งหมด</p>
-        </div>
-        <div>
-          <label class="text-sm text-gray-600 mr-2">เลือกงวดเดือน:</label>
-          <input type="month" id="filterMonth" class="border rounded px-3 py-1.5 text-sm" onchange="loadReadings()">
-        </div>
+    <!-- TAB: ผลการจด/ค่าน้ำ -->
+    <section id="tab-read" class="hidden space-y-4">
+      <div class="card flex flex-wrap gap-2 items-center no-print">
+        <input id="readSearch" class="inp" style="flex:1;min-width:200px" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่">
+        <button onclick="exportReadings()" class="btn bg-gray-200 hover:bg-gray-300">⬇️ CSV</button>
+        <button onclick="window.print()" class="btn bg-gray-200 hover:bg-gray-300">🖨️ พิมพ์</button>
       </div>
-
-      <!-- ตารางแสดงประวัติการจด -->
-      <div class="bg-white rounded-lg shadow-md overflow-x-auto">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
-              <th class="p-3">งวดเดือน</th>
-              <th class="p-3">บ้านเลขที่ / เจ้าของ</th>
-              <th class="p-3">เลขครั้งก่อน</th>
-              <th class="p-3">เลขครั้งนี้</th>
-              <th class="p-3">ใช้ไป (หน่วย)</th>
-              <th class="p-3">ยอดเงิน (บาท)</th>
-              <th class="p-3">ผู้จด</th>
-            </tr>
-          </thead>
-          <tbody id="readingTableBody" class="divide-y divide-gray-200 text-sm">
-            <tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>
-          </tbody>
+      <div id="readSummary" class="text-sm text-gray-600"></div>
+      <div class="card-t">
+        <table>
+          <thead><tr>
+            <th>บ้านเลขที่</th><th>ชื่อ</th><th>ครั้งก่อน</th><th>ครั้งนี้</th>
+            <th>ใช้ (หน่วย)</th><th>ค่าน้ำ (บาท)</th><th>ผู้จด</th><th>เวลา</th>
+            <th class="no-print">รูป</th><th class="no-print">จัดการ</th>
+          </tr></thead>
+          <tbody id="readBody"></tbody>
         </table>
+      </div>
+      <p class="text-xs text-gray-400">* ค่าน้ำคำนวณจากอัตราค่าน้ำปัจจุบันในแท็บ "อัตราค่าน้ำ"</p>
+    </section>
+
+    <!-- TAB: อัตราค่าน้ำ -->
+    <section id="tab-rate" class="hidden">
+      <div class="card max-w-xl space-y-3">
+        <h2 class="font-bold text-lg">💰 อัตราค่าน้ำประปา</h2>
+        <label class="block text-sm">ชื่อหมู่บ้าน / ระบบประปา
+          <input id="sVillage" class="inp mt-1"></label>
+        <label class="block text-sm">ราคาต่อหน่วย (บาท / ลบ.ม.)
+          <input id="sPrice" type="number" step="0.01" min="0" class="inp mt-1" oninput="testCalc()"></label>
+        <label class="block text-sm">ค่าน้ำขั้นต่ำ (บาท) — ถ้าคิดแล้วต่ำกว่านี้ จะเก็บเท่ายอดนี้
+          <input id="sMin" type="number" step="0.01" min="0" class="inp mt-1" oninput="testCalc()"></label>
+        <label class="block text-sm">ค่าบริการ / ค่ารักษามาตร (บาท / เดือน)
+          <input id="sFee" type="number" step="0.01" min="0" class="inp mt-1" oninput="testCalc()"></label>
+        <label class="block text-sm">แจ้งเตือนเมื่อใช้น้ำเกิน (หน่วย / เดือน)
+          <input id="sWarn" type="number" min="0" class="inp mt-1"></label>
+        <div class="bg-blue-50 rounded-lg p-3 text-sm flex flex-wrap items-center gap-2">
+          🧮 ทดลองคำนวณ: ใช้
+          <input id="sTest" type="number" value="15" class="inp" style="width:90px" oninput="testCalc()">
+          หน่วย = <b id="sTestResult" class="text-green-700 text-base"></b> บาท
+        </div>
+        <button onclick="saveSettings()" class="btn bg-blue-600 hover:bg-blue-700 text-white">💾 บันทึกอัตราค่าน้ำ</button>
+        <p id="sUpdated" class="text-xs text-gray-500"></p>
       </div>
     </section>
 
+    <!-- TAB: ผู้ใช้งาน -->
+    <section id="tab-user" class="hidden space-y-4">
+      <div class="card space-y-3">
+        <h2 class="font-bold">➕ เพิ่มผู้ใช้งาน</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+          <input id="uEmail" type="email" class="inp" placeholder="อีเมล">
+          <input id="uName" class="inp" placeholder="ชื่อ-สกุล">
+          <select id="uRole" class="inp">
+            <option value="staff">สตาฟ (จดมิเตอร์อย่างเดียว)</option>
+            <option value="admin">แอดมิน (เข้าหลังบ้านได้)</option>
+          </select>
+          <input id="uPass" type="text" class="inp" placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัว) — เว้นว่างถ้ามีบัญชีแล้ว">
+        </div>
+        <button onclick="addStaff()" class="btn bg-green-600 hover:bg-green-700 text-white">บันทึกผู้ใช้</button>
+        <p class="text-xs text-gray-500">* ถ้าใส่รหัสผ่าน ระบบจะสร้างบัญชีล็อกอินให้ด้วย / ถ้าเว้นว่าง จะเพิ่มแค่รายชื่อและสิทธิ์ (สำหรับคนที่มีบัญชีใน Supabase อยู่แล้ว)</p>
+      </div>
+      <div class="card-t">
+        <table>
+          <thead><tr><th>อีเมล</th><th>ชื่อ</th><th>สิทธิ์</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody id="staffBody"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
+</div>
 
-  <!-- Modal เพิ่ม/แก้ไข บ้าน -->
-  <div id="householdModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-xl space-y-4">
-      <h3 id="modalTitle" class="text-lg font-bold text-gray-800">เพิ่มบ้านใหม่</h3>
-      <input type="hidden" id="editHouseholdId">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">บ้านเลขที่</label>
-        <input type="text" id="houseNo" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="เช่น 123/4">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ - สกุล เจ้าของบ้าน</label>
-        <input type="text" id="ownerName" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="เช่น นายสมชาย ใจดี">
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">เลขมิเตอร์ตั้งต้น (Initial Reading)</label>
-        <input type="number" id="initialReading" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="0">
-      </div>
-      <div class="flex justify-end gap-3 pt-4 border-t">
-        <button onclick="closeModal()" class="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded-lg text-sm transition">ยกเลิก</button>
-        <button onclick="saveHousehold()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition">บันทึก</button>
+<!-- ===== Modal: บ้าน ===== -->
+<div id="houseModal" class="hidden">
+  <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-md p-6 space-y-3 max-h-[90vh] overflow-auto">
+      <h3 id="hTitle" class="text-lg font-bold">เพิ่มบ้านใหม่</h3>
+      <input type="hidden" id="hId">
+      <label class="block text-sm">บ้านเลขที่<input id="hNo" class="inp mt-1" placeholder="เช่น 12/3"></label>
+      <label class="block text-sm">ชื่อ-สกุล เจ้าของบ้าน *<input id="hOwner" class="inp mt-1"></label>
+      <label id="wrapMeterNo" class="block text-sm">เลขมิเตอร์ / รหัสมิเตอร์<input id="hMeterNo" class="inp mt-1"></label>
+      <label id="wrapDigits" class="block text-sm">จำนวนหลักของมิเตอร์ (ใช้คำนวณตอนมิเตอร์วนรอบ)<input id="hDigits" type="number" min="1" max="9" class="inp mt-1" placeholder="เช่น 4"></label>
+      <label class="block text-sm">เลขมิเตอร์ตั้งต้น<input id="hInit" type="number" step="0.01" class="inp mt-1"></label>
+      <label class="flex items-center gap-2 text-sm"><input id="hActive" type="checkbox"> เปิดใช้งาน (แสดงในหน้าจดมิเตอร์)</label>
+      <div class="flex justify-end gap-2 pt-3 border-t">
+        <button onclick="closeModal('houseModal')" class="btn bg-gray-200">ยกเลิก</button>
+        <button onclick="saveHouse()" class="btn bg-blue-600 text-white">บันทึก</button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Script เชื่อมต่อ Supabase และจัดการระบบ -->
-  <script>
-    // ⚙️ ตั้งค่าการเชื่อมต่อ Supabase (ใช้ค่าเดียวกับหน้า index.html)
-    const CONFIG = {
-      SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',
-      SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHlnZWVnYnhjZHJndGFhZnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMjQ5NDcsImV4cCI6MjEwODkwMDk0N30.kK-sZw_MB8DnH4YQUCUcmmLBL0fEGg2F0o9ke2tzkV0'
-    };
+<!-- ===== Modal: แก้ผลการจด ===== -->
+<div id="readModal" class="hidden">
+  <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-sm p-6 space-y-3">
+      <h3 class="text-lg font-bold">แก้ไขเลขมิเตอร์</h3>
+      <input type="hidden" id="rId">
+      <p id="rInfo" class="text-sm text-gray-600"></p>
+      <label class="block text-sm">เลขมิเตอร์ครั้งนี้<input id="rValue" type="number" step="0.01" class="inp mt-1"></label>
+      <div class="flex justify-end gap-2 pt-3 border-t">
+        <button onclick="closeModal('readModal')" class="btn bg-gray-200">ยกเลิก</button>
+        <button onclick="saveReading()" class="btn bg-blue-600 text-white">บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-    const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+<!-- ===== Modal: รูปมิเตอร์ ===== -->
+<div id="photoModal" class="hidden">
+  <div class="fixed inset-0 bg-black/80 z-40 flex items-center justify-center p-4" onclick="closeModal('photoModal')">
+    <img id="photoImg" class="max-h-[90vh] max-w-full rounded-lg" alt="รูปมิเตอร์">
+  </div>
+</div>
 
-    // ตรวจสอบสถานะล็อกอินเบื้องต้น
-    async function checkAuth() {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) {
-        window.location.href = 'index.html';
-      }
+<div id="toast" style="display:none"></div>
+
+<script>
+// ================== ตั้งค่า ==================
+const CONFIG = {
+  SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',
+  SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHlnZWVnYnhjZHJndGFhZnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMjQ5NDcsImV4cCI6MjEwODkwMDk0N30.kK-sZw_MB8DnH4YQUCUcmmLBL0fEGg2F0o9ke2tzkV0',
+  PHOTO_BUCKET: 'meter-photos'
+};
+const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+
+// ชื่อคอลัมน์ที่ระบบจะลองหาอัตโนมัติ (รองรับหลายแบบ)
+const READ_CANDS = {
+  period:    ['period','billing_month','month','reading_month'],
+  value:     ['reading','current_reading','meter_reading','reading_value','value'],
+  household: ['household_id','house_id'],
+  photo:     ['photo_path','photo_url','photo','image_url','image_path'],
+  by:        ['recorded_by','staff_email','staff_name','created_by','user_email'],
+  at:        ['recorded_at','created_at']
+};
+const METER_NO_CANDS = ['meter_no','meter_number','meter_id','meter_code'];
+
+const S = { user:null, houses:[], readings:[], staff:[], settings:{}, rc:{}, hkeys:new Set(), meterNoCol:null, rows:[], byHouse:new Map() };
+
+// ================== ตัวช่วย ==================
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => (v === null || v === undefined || v === '') ? null : Number(v);
+const fmt = (n, d = 0) => (n === null || n === undefined || isNaN(n)) ? '-' :
+  Number(n).toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
+const ym = v => v ? String(v).slice(0, 7) : '';
+const rPer = r => ym(S.rc.period ? r[S.rc.period] : r[S.rc.at]);
+const rVal = r => num(r[S.rc.value]);
+const houseNoHtml = h => h.house_no ? esc(h.house_no) : '<span class="text-orange-500 text-xs">ยังไม่ระบุ</span>';
+const byText = v => !v ? '-' : (/^[0-9a-f-]{36}$/i.test(String(v)) ? 'ID ' + String(v).slice(0, 8) : String(v));
+const thTime = v => v ? new Date(v).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+
+function sortByHouse(a, b) {
+  const x = a.house_no, y = b.house_no;
+  if (!x && !y) return String(a.owner_name ?? '').localeCompare(String(b.owner_name ?? ''), 'th');
+  if (!x) return 1;
+  if (!y) return -1;
+  return String(x).localeCompare(String(y), 'th', { numeric: true });
+}
+
+function toast(msg, ok = true) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg text-white shadow-lg z-50 ' + (ok ? 'bg-green-600' : 'bg-red-600');
+  t.style.display = 'block';
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.style.display = 'none', 3500);
+}
+function showView(v) { ['Login','Denied','App'].forEach(x => $('view' + x).classList.toggle('hidden', x !== v)); }
+function closeModal(id) { $(id).classList.add('hidden'); }
+
+function downloadCSV(filename, rows) {
+  const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = filename;
+  a.click();
+}
+
+async function fetchAll(table) {
+  const size = 1000; let from = 0, all = [];
+  while (true) {
+    const { data, error } = await sb.from(table).select('*').order('id', { ascending: true }).range(from, from + size - 1);
+    if (error) throw error;
+    all = all.concat(data);
+    if (data.length < size) break;
+    from += size;
+  }
+  return all;
+}
+
+// ================== ล็อกอิน / สิทธิ์ ==================
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showView('Login');
+  S.user = session.user;
+
+  const { data, error } = await sb.from('staff').select('*').eq('email', S.user.email.toLowerCase()).maybeSingle();
+  if (error) {
+    $('deniedMsg').textContent = 'ตรวจสิทธิ์ไม่ได้: ' + error.message + ' (รัน SQL ขั้นที่ 1 แล้วหรือยัง?)';
+    return showView('Denied');
+  }
+  if (!data || data.role !== 'admin' || data.active === false) {
+    $('deniedMsg').textContent = `บัญชี ${S.user.email} ไม่ได้เป็นแอดมิน`;
+    return showView('Denied');
+  }
+  $('whoami').textContent = `${data.full_name || ''} (${S.user.email})`;
+  showView('App');
+  await reloadAll();
+}
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('loginMsg').textContent = 'กำลังเข้าสู่ระบบ...';
+  const { error } = await sb.auth.signInWithPassword({ email: $('loginEmail').value.trim(), password: $('loginPass').value });
+  if (error) { $('loginMsg').textContent = 'เข้าสู่ระบบไม่สำเร็จ: ' + error.message; return; }
+  $('loginMsg').textContent = '';
+  init();
+});
+
+async function logout() { await sb.auth.signOut(); location.reload(); }
+
+// ================== โหลดข้อมูล ==================
+async function reloadAll() {
+  $('loadMsg').textContent = 'กำลังโหลด...';
+  try {
+    const [houses, readings, settings, staff] = await Promise.all([
+      fetchAll('households'),
+      fetchAll('readings'),
+      sb.from('settings').select('*').eq('id', 1).maybeSingle(),
+      sb.from('staff').select('*').order('created_at', { ascending: true })
+    ]);
+    if (settings.error) throw settings.error;
+    if (staff.error) throw staff.error;
+    S.houses = houses;
+    S.readings = readings;
+    S.settings = settings.data || {};
+    S.staff = staff.data || [];
+    detectCols();
+    renderAll();
+    $('loadMsg').textContent = 'อัปเดตล่าสุด ' + new Date().toLocaleTimeString('th-TH');
+  } catch (e) {
+    console.error(e);
+    $('loadMsg').textContent = '⚠️ โหลดไม่สำเร็จ: ' + (e.message || e);
+  }
+}
+
+function detectCols() {
+  const r = S.readings[0];
+  if (r) {
+    S.rc = {};
+    for (const [k, list] of Object.entries(READ_CANDS)) S.rc[k] = list.find(c => c in r) || null;
+  } else {
+    S.rc = { period: 'period', value: 'reading', household: 'household_id', photo: null, by: null, at: 'created_at' };
+  }
+  const h = S.houses[0] || { house_no: 1, owner_name: 1, initial_reading: 1, active: 1 };
+  S.hkeys = new Set(Object.keys(h));
+  S.meterNoCol = METER_NO_CANDS.find(c => S.hkeys.has(c)) || null;
+  if (r && !S.rc.value) toast('หาคอลัมน์เลขมิเตอร์ในตาราง readings ไม่เจอ', false);
+}
+
+// ================== คำนวณ ==================
+function calcBill(units, s = S.settings) {
+  let a = units * Number(s.price_per_unit || 0);
+  a = Math.max(a, Number(s.min_charge || 0));
+  return Math.round((a + Number(s.service_fee || 0)) * 100) / 100;
+}
+
+function computeMonth(month) {
+  const rc = S.rc, byH = new Map();
+  for (const r of S.readings) {
+    const k = String(r[rc.household]);
+    if (!byH.has(k)) byH.set(k, []);
+    byH.get(k).push(r);
+  }
+  for (const l of byH.values()) {
+    l.sort((a, b) => rPer(a).localeCompare(rPer(b)) || String(a[rc.at] || '').localeCompare(String(b[rc.at] || '')));
+  }
+  S.byHouse = byH;
+
+  const warn = Number(S.settings.high_usage_warn || 100);
+  return S.houses.map(h => {
+    const list = byH.get(String(h.id)) || [];
+    const cur = [...list].reverse().find(r => rPer(r) === month);
+    const prevR = [...list].reverse().find(r => rPer(r) < month);
+    const prev = prevR ? rVal(prevR) : (num(h.initial_reading) ?? 0);
+    let units = null, flag = '';
+    if (cur) {
+      units = rVal(cur) - prev;
+      if (units < 0 && h.meter_digits) { units += Math.pow(10, Number(h.meter_digits)); flag = 'มิเตอร์วนรอบ'; }
+      if (units < 0) flag = 'เลขน้อยกว่าครั้งก่อน';
+      else if (units > warn) flag = 'ใช้น้ำสูงผิดปกติ';
     }
+    const amount = (cur && units >= 0) ? calcBill(units) : null;
+    return { h, cur, prev, units, amount, flag };
+  });
+}
 
-    // ออกจากระบบ
-    document.getElementById('btnLogout').addEventListener('click', async () => {
-      await supabaseClient.auth.signOut();
-      window.location.href = 'index.html';
+// ================== แสดงผล ==================
+function renderAll() {
+  $('villageName').textContent = S.settings.village_name ? '· ' + S.settings.village_name : '';
+  S.rows = computeMonth($('month').value);
+  renderDash(); renderHouses(); renderReadings(); renderSettings(); renderStaff();
+}
+
+function renderDash() {
+  const act = S.rows.filter(r => r.h.active !== false);
+  const done = act.filter(r => r.cur);
+  const pending = act.filter(r => !r.cur).sort((a, b) => sortByHouse(a.h, b.h));
+  const anomalies = done.filter(r => r.flag && r.flag !== 'มิเตอร์วนรอบ');
+  const units = done.reduce((s, r) => s + (r.units > 0 ? r.units : 0), 0);
+  const money = done.reduce((s, r) => s + (r.amount || 0), 0);
+  const pct = act.length ? Math.round(done.length * 100 / act.length) : 0;
+
+  const k = (label, val, color = '') =>
+    `<div class="card"><p class="text-xs text-gray-500">${label}</p><p class="text-2xl font-bold ${color}">${val}</p></div>`;
+  $('kpis').innerHTML =
+    k('บ้านที่ใช้งาน', fmt(act.length)) +
+    k('จดแล้ว', `${fmt(done.length)} <span class="text-sm text-gray-400">(${pct}%)</span>`, 'text-green-600') +
+    k('ยังไม่จด', fmt(pending.length), 'text-orange-500') +
+    k('หน่วยรวม', fmt(units), 'text-blue-600') +
+    k('ค่าน้ำรวม (บาท)', fmt(money, 2), 'text-green-700') +
+    k('ผิดปกติ', fmt(anomalies.length), 'text-red-600');
+
+  $('pendingCount').textContent = pending.length;
+  $('pendingList').innerHTML = pending.map(r => `
+    <div class="py-1.5 flex justify-between gap-2">
+      <span>${houseNoHtml(r.h)} · ${esc(r.h.owner_name)}</span>
+      <span class="text-gray-400">${S.meterNoCol ? esc(r.h[S.meterNoCol] ?? '') : ''}</span>
+    </div>`).join('') || '<p class="text-green-600 py-2">🎉 จดครบทุกบ้านแล้ว</p>';
+
+  $('anomalyCount').textContent = anomalies.length;
+  $('anomalyList').innerHTML = anomalies.map(r => `
+    <div class="py-1.5 flex justify-between items-center gap-2">
+      <span>${houseNoHtml(r.h)} · ${esc(r.h.owner_name)}<br>
+        <span class="text-xs text-red-600">${r.flag}: ${fmt(r.prev)} → ${fmt(rVal(r.cur))} (${fmt(r.units)} หน่วย)</span></span>
+      <button onclick="openReading('${r.cur.id}')" class="text-blue-600 text-xs hover:underline">ตรวจ/แก้</button>
+    </div>`).join('') || '<p class="text-gray-400 py-2">ไม่มีรายการผิดปกติ</p>';
+}
+
+function renderHouses() {
+  const q = $('houseSearch').value.trim().toLowerCase();
+  const f = $('houseFilter').value, mc = S.meterNoCol;
+  $('thMeterNo').style.display = mc ? '' : 'none';
+
+  const list = S.houses
+    .filter(h => f === 'all' || (f === 'active' && h.active !== false) || (f === 'inactive' && h.active === false) || (f === 'noHouseNo' && !h.house_no))
+    .filter(h => !q || [h.house_no, h.owner_name, mc ? h[mc] : ''].some(v => String(v ?? '').toLowerCase().includes(q)))
+    .sort(sortByHouse);
+
+  $('houseCount').textContent = `แสดง ${list.length} จาก ${S.houses.length} หลัง`;
+  $('houseBody').innerHTML = list.map(h => {
+    const l = (S.byHouse.get(String(h.id)) || []).slice(-1)[0];
+    const on = h.active !== false;
+    return `<tr class="hover:bg-gray-50">
+      <td>${houseNoHtml(h)}</td>
+      <td class="font-medium">${esc(h.owner_name)}</td>
+      ${mc ? `<td>${esc(h[mc] ?? '-')}</td>` : ''}
+      <td>${fmt(num(h.initial_reading))}</td>
+      <td>${l ? `${fmt(rVal(l))} <span class="text-xs text-gray-400">(${rPer(l)})</span>` : '-'}</td>
+      <td><button onclick="toggleHouse('${h.id}')" class="px-2 py-1 text-xs rounded-full ${on ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${on ? 'ใช้งาน' : 'ระงับ'}</button></td>
+      <td style="text-align:center"><button onclick="openHouse('${h.id}')" class="text-blue-600 hover:underline">แก้ไข</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="text-center text-gray-400">ไม่พบข้อมูล</td></tr>';
+}
+
+function readingRowsFiltered() {
+  const q = $('readSearch').value.trim().toLowerCase();
+  return S.rows.filter(r => r.cur)
+    .filter(r => !q || [r.h.house_no, r.h.owner_name].some(v => String(v ?? '').toLowerCase().includes(q)))
+    .sort((a, b) => sortByHouse(a.h, b.h));
+}
+
+function renderReadings() {
+  const list = readingRowsFiltered();
+  const units = list.reduce((s, r) => s + (r.units > 0 ? r.units : 0), 0);
+  const money = list.reduce((s, r) => s + (r.amount || 0), 0);
+  $('readSummary').innerHTML = `งวด <b>${$('month').value}</b> · จดแล้ว <b>${fmt(list.length)}</b> หลัง · ใช้รวม <b>${fmt(units)}</b> หน่วย · ค่าน้ำรวม <b class="text-green-700">${fmt(money, 2)}</b> บาท`;
+
+  $('readBody').innerHTML = list.map(r => {
+    const bad = r.flag && r.flag !== 'มิเตอร์วนรอบ';
+    const photo = S.rc.photo ? r.cur[S.rc.photo] : null;
+    return `<tr class="${bad ? 'bg-red-50' : 'hover:bg-gray-50'}">
+      <td>${houseNoHtml(r.h)}</td>
+      <td class="font-medium">${esc(r.h.owner_name)}</td>
+      <td>${fmt(r.prev)}</td>
+      <td>${fmt(rVal(r.cur))}</td>
+      <td class="font-bold text-blue-600">${fmt(r.units)}${r.flag ? `<div class="text-xs ${bad ? 'text-red-600' : 'text-gray-500'} font-normal">⚠️ ${r.flag}</div>` : ''}</td>
+      <td class="font-bold text-green-700">${r.amount == null ? '-' : fmt(r.amount, 2)}</td>
+      <td class="text-xs">${esc(byText(S.rc.by ? r.cur[S.rc.by] : null))}</td>
+      <td class="text-xs">${thTime(r.cur[S.rc.at])}</td>
+      <td class="no-print">${photo ? `<button onclick="viewPhoto('${r.cur.id}')" title="ดูรูป">📷</button>` : '-'}</td>
+      <td class="no-print whitespace-nowrap">
+        <button onclick="openReading('${r.cur.id}')" class="text-blue-600 hover:underline">แก้ไข</button>
+        <button onclick="delReading('${r.cur.id}')" class="text-red-600 hover:underline ml-2">ลบ</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="text-center text-gray-400">ยังไม่มีการจดมิเตอร์ในงวดนี้</td></tr>';
+}
+
+// ================== จัดการบ้าน ==================
+function openHouse(id) {
+  const h = id ? S.houses.find(x => String(x.id) === String(id)) : {};
+  $('hTitle').textContent = id ? 'แก้ไขข้อมูลบ้าน' : 'เพิ่มบ้านใหม่';
+  $('hId').value = id || '';
+  $('hNo').value = h.house_no ?? '';
+  $('hOwner').value = h.owner_name ?? '';
+  $('hMeterNo').value = S.meterNoCol ? (h[S.meterNoCol] ?? '') : '';
+  $('hDigits').value = h.meter_digits ?? '';
+  $('hInit').value = h.initial_reading ?? 0;
+  $('hActive').checked = h.active !== false;
+  $('wrapMeterNo').style.display = S.meterNoCol ? '' : 'none';
+  $('wrapDigits').style.display = S.hkeys.has('meter_digits') ? '' : 'none';
+  $('houseModal').classList.remove('hidden');
+}
+
+async function saveHouse() {
+  const id = $('hId').value;
+  const p = {
+    house_no: $('hNo').value.trim() || null,
+    owner_name: $('hOwner').value.trim(),
+    initial_reading: Number($('hInit').value || 0),
+    active: $('hActive').checked
+  };
+  if (S.meterNoCol) p[S.meterNoCol] = $('hMeterNo').value.trim() || null;
+  if (S.hkeys.has('meter_digits') && $('hDigits').value) p.meter_digits = Number($('hDigits').value);
+  if (!p.owner_name) return toast('กรุณากรอกชื่อเจ้าของบ้าน', false);
+
+  const res = id
+    ? await sb.from('households').update(p).eq('id', id).select()
+    : await sb.from('households').insert(p).select();
+  if (res.error) return toast('บันทึกไม่สำเร็จ: ' + res.error.message, false);
+  if (!res.data || !res.data.length) return toast('ไม่มีสิทธิ์แก้ไข (ตรวจสอบว่าเป็นแอดมิน)', false);
+  closeModal('houseModal');
+  toast('บันทึกข้อมูลบ้านแล้ว');
+  reloadAll();
+}
+
+async function toggleHouse(id) {
+  const h = S.houses.find(x => String(x.id) === String(id));
+  const to = h.active === false;
+  if (!confirm(`${to ? 'เปิดใช้งาน' : 'ระงับ'}บ้าน "${h.owner_name}" ?\n(บ้านที่ระงับจะไม่แสดงในหน้าจดมิเตอร์)`)) return;
+  const { data, error } = await sb.from('households').update({ active: to }).eq('id', id).select();
+  if (error || !data.length) return toast('เปลี่ยนสถานะไม่สำเร็จ' + (error ? ': ' + error.message : ''), false);
+  toast(to ? 'เปิดใช้งานแล้ว' : 'ระงับแล้ว');
+  reloadAll();
+}
+
+function exportHouses() {
+  const mc = S.meterNoCol;
+  const rows = [['บ้านเลขที่', 'ชื่อเจ้าของ', 'เลขมิเตอร์', 'เลขตั้งต้น', 'สถานะ']];
+  [...S.houses].sort(sortByHouse).forEach(h =>
+    rows.push([h.house_no, h.owner_name, mc ? h[mc] : '', h.initial_reading, h.active !== false ? 'ใช้งาน' : 'ระงับ']));
+  downloadCSV('รายชื่อบ้าน.csv', rows);
+}
+
+// ================== จัดการผลการจด ==================
+function openReading(id) {
+  const r = S.readings.find(x => String(x.id) === String(id));
+  const h = S.houses.find(x => String(x.id) === String(r[S.rc.household])) || {};
+  $('rId').value = id;
+  $('rInfo').textContent = `${h.house_no || 'ยังไม่ระบุบ้านเลขที่'} · ${h.owner_name || ''} · งวด ${rPer(r)}`;
+  $('rValue').value = rVal(r) ?? '';
+  $('readModal').classList.remove('hidden');
+}
+
+async function saveReading() {
+  const v = $('rValue').value;
+  if (v === '') return toast('กรุณากรอกเลขมิเตอร์', false);
+  const { data, error } = await sb.from('readings').update({ [S.rc.value]: Number(v) }).eq('id', $('rId').value).select();
+  if (error || !data.length) return toast('แก้ไขไม่สำเร็จ' + (error ? ': ' + error.message : ''), false);
+  closeModal('readModal');
+  toast('แก้ไขเลขมิเตอร์แล้ว');
+  reloadAll();
+}
+
+async function delReading(id) {
+  if (!confirm('ลบผลการจดนี้? (สตาฟจะต้องจดบ้านนี้ใหม่)')) return;
+  const { error } = await sb.from('readings').delete().eq('id', id);
+  if (error) return toast('ลบไม่สำเร็จ: ' + error.message, false);
+  toast('ลบแล้ว');
+  reloadAll();
+}
+
+async function viewPhoto(id) {
+  const r = S.readings.find(x => String(x.id) === String(id));
+  const v = String(r[S.rc.photo] || '');
+  let url = v;
+  if (!/^https?:/i.test(v)) {
+    const path = v.replace(new RegExp('^' + CONFIG.PHOTO_BUCKET + '/'), '');
+    const { data, error } = await sb.storage.from(CONFIG.PHOTO_BUCKET).createSignedUrl(path, 3600);
+    if (error) return toast('เปิดรูปไม่ได้: ' + error.message, false);
+    url = data.signedUrl;
+  }
+  $('photoImg').src = url;
+  $('photoModal').classList.remove('hidden');
+}
+
+function exportReadings() {
+  const mc = S.meterNoCol, m = $('month').value;
+  const rows = [['งวด', 'บ้านเลขที่', 'ชื่อ', 'เลขมิเตอร์', 'ครั้งก่อน', 'ครั้งนี้', 'ใช้ (หน่วย)', 'ค่าน้ำ (บาท)', 'หมายเหตุ', 'ผู้จด', 'เวลา']];
+  readingRowsFiltered().forEach(r => rows.push([
+    m, r.h.house_no, r.h.owner_name, mc ? r.h[mc] : '', r.prev, rVal(r.cur), r.units, r.amount, r.flag,
+    byText(S.rc.by ? r.cur[S.rc.by] : null), thTime(r.cur[S.rc.at])
+  ]));
+  downloadCSV(`ค่าน้ำ_${m}.csv`, rows);
+}
+
+// ================== อัตราค่าน้ำ ==================
+function renderSettings() {
+  const s = S.settings;
+  $('sVillage').value = s.village_name ?? '';
+  $('sPrice').value = s.price_per_unit ?? 0;
+  $('sMin').value = s.min_charge ?? 0;
+  $('sFee').value = s.service_fee ?? 0;
+  $('sWarn').value = s.high_usage_warn ?? 100;
+  $('sUpdated').textContent = s.updated_at ? 'แก้ไขล่าสุด ' + thTime(s.updated_at) : '';
+  testCalc();
+}
+
+function testCalc() {
+  const s = { price_per_unit: $('sPrice').value, min_charge: $('sMin').value, service_fee: $('sFee').value };
+  $('sTestResult').textContent = fmt(calcBill(Number($('sTest').value || 0), s), 2);
+}
+
+async function saveSettings() {
+  const p = {
+    id: 1,
+    village_name: $('sVillage').value.trim(),
+    price_per_unit: Number($('sPrice').value || 0),
+    min_charge: Number($('sMin').value || 0),
+    service_fee: Number($('sFee').value || 0),
+    high_usage_warn: Number($('sWarn').value || 100),
+    updated_at: new Date().toISOString()
+  };
+  const { data, error } = await sb.from('settings').upsert(p).select();
+  if (error || !data.length) return toast('บันทึกไม่สำเร็จ' + (error ? ': ' + error.message : ''), false);
+  toast('บันทึกอัตราค่าน้ำแล้ว');
+  reloadAll();
+}
+
+// ================== ผู้ใช้งาน ==================
+function renderStaff() {
+  const me = S.user.email.toLowerCase();
+  $('staffBody').innerHTML = S.staff.map(u => {
+    const self = u.email === me;
+    return `<tr>
+      <td>${esc(u.email)} ${self ? '<span class="text-xs text-blue-600">(คุณ)</span>' : ''}</td>
+      <td>${esc(u.full_name || '-')}</td>
+      <td><select class="inp" style="width:auto;padding:.25rem .5rem" ${self ? 'disabled' : ''}
+            onchange="updStaff('${u.id}', {role:this.value})">
+          <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>สตาฟ</option>
+          <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>แอดมิน</option>
+        </select></td>
+      <td><button ${self ? 'disabled' : ''} onclick="updStaff('${u.id}', {active:${!u.active}})"
+            class="px-2 py-1 text-xs rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${u.active ? 'ใช้งาน' : 'ระงับ'}</button></td>
+      <td>${self ? '-' : `<button onclick="delStaff('${u.id}')" class="text-red-600 hover:underline">ลบ</button>`}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">ยังไม่มีผู้ใช้</td></tr>';
+}
+
+async function addStaff() {
+  const email = $('uEmail').value.trim().toLowerCase();
+  const full_name = $('uName').value.trim();
+  const role = $('uRole').value;
+  const pass = $('uPass').value;
+  if (!email) return toast('กรุณากรอกอีเมล', false);
+
+  if (pass) {
+    if (pass.length < 6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', false);
+    // ใช้ client แยก เพื่อไม่ให้แอดมินถูกล็อกเอาต์
+    const tmp = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'tmp-signup' }
     });
+    const { error } = await tmp.auth.signUp({ email, password: pass });
+    if (error) return toast('สร้างบัญชีล็อกอินไม่สำเร็จ: ' + error.message, false);
+  }
 
-    // สลับแท็บหน้าจอ
-    function switchTab(tab) {
-      if (tab === 'households') {
-        document.getElementById('tabHouseholdContent').classList.remove('hidden');
-        document.getElementById('tabReadingContent').classList.add('hidden');
-        document.getElementById('tabHouseholdBtn').className = "py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none";
-        document.getElementById('tabReadingBtn').className = "py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none";
-        loadHouseholds();
-      } else {
-        document.getElementById('tabHouseholdContent').classList.add('hidden');
-        document.getElementById('tabReadingContent').classList.remove('hidden');
-        document.getElementById('tabReadingBtn').className = "py-2 px-4 font-semibold border-b-2 border-blue-600 text-blue-600 focus:outline-none";
-        document.getElementById('tabHouseholdBtn').className = "py-2 px-4 font-semibold text-gray-500 hover:text-blue-600 focus:outline-none";
-        loadReadings();
-      }
-    }
+  const { error } = await sb.from('staff').upsert({ email, full_name, role, active: true }, { onConflict: 'email' });
+  if (error) return toast('บันทึกผู้ใช้ไม่สำเร็จ: ' + error.message, false);
+  ['uEmail', 'uName', 'uPass'].forEach(x => $(x).value = '');
+  toast('เพิ่มผู้ใช้แล้ว');
+  reloadAll();
+}
 
-    // โหลดข้อมูลบ้าน
-    async function loadHouseholds() {
-      const tbody = document.getElementById('householdTableBody');
-      tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>`;
+async function updStaff(id, patch) {
+  const { data, error } = await sb.from('staff').update(patch).eq('id', id).select();
+  if (error || !data.length) return toast('แก้ไขไม่สำเร็จ' + (error ? ': ' + error.message : ''), false);
+  toast('อัปเดตแล้ว');
+  reloadAll();
+}
 
-      const { data, error } = await supabaseClient
-        .from('households')
-        .select('*')
-        .order('house_no', { ascending: true });
+async function delStaff(id) {
+  if (!confirm('ลบผู้ใช้นี้ออกจากรายชื่อ?')) return;
+  const { error } = await sb.from('staff').delete().eq('id', id);
+  if (error) return toast('ลบไม่สำเร็จ: ' + error.message, false);
+  toast('ลบแล้ว');
+  reloadAll();
+}
 
-      if (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
-        return;
-      }
+// ================== เริ่มทำงาน ==================
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b));
+  ['dash', 'house', 'read', 'rate', 'user'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab));
+  $('monthBar').style.display = ['dash', 'read'].includes(b.dataset.tab) ? '' : 'none';
+}));
+$('month').addEventListener('change', () => { S.rows = computeMonth($('month').value); renderDash(); renderReadings(); });
+$('houseSearch').addEventListener('input', renderHouses);
+$('houseFilter').addEventListener('change', renderHouses);
+$('readSearch').addEventListener('input', renderReadings);
 
-      if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">ยังไม่มีข้อมูลบ้านในระบบ</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = data.map(h => `
-        <tr class="hover:bg-gray-50">
-          <td class="p-3 font-medium">${h.house_no || '-'}</td>
-          <td class="p-3">${h.owner_name || '-'}</td>
-          <td class="p-3">${h.initial_reading || 0}</td>
-          <td class="p-3"><span class="px-2 py-1 text-xs rounded-full ${h.active !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${h.active !== false ? 'ใช้งาน' : 'ระงับ'}</span></td>
-          <td class="p-3 text-center space-x-2">
-            <button onclick="openEditModal('${h.id}', '${h.house_no}', '${h.owner_name}', ${h.initial_reading})" class="text-blue-600 hover:underline text-sm font-medium">แก้ไข</button>
-          </td>
-        </tr>
-      `).join('');
-    }
-
-    // โหลดประวัติการจดมิเตอร์
-    async function loadReadings() {
-      const tbody = document.getElementById('readingTableBody');
-      const monthFilter = document.getElementById('filterMonth').value;
-      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">กำลังโหลดข้อมูล...</td></tr>`;
-
-      let query = supabaseClient
-        .from('readings')
-        .select(`*, households (house_no, owner_name)`)
-        .order('created_at', { ascending: false });
-
-      if (monthFilter) {
-        query = query.eq('billing_month', monthFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ไม่พบประวัติการจดมิเตอร์ในงวดนี้</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = data.map(r => `
-        <tr class="hover:bg-gray-50">
-          <td class="p-3 text-sm">${r.billing_month}</td>
-          <td class="p-3 text-sm font-medium">${r.households?.house_no || ''} - ${r.households?.owner_name || ''}</td>
-          <td class="p-3 text-sm">${r.previous_reading}</td>
-          <td class="p-3 text-sm">${r.current_reading}</td>
-          <td class="p-3 text-sm text-blue-600 font-bold">${r.units_used}</td>
-          <td class="p-3 text-sm text-green-600 font-bold">฿${r.total_amount}</td>
-          <td class="p-3 text-xs text-gray-500">${r.staff_name || '-'}</td>
-        </tr>
-      `).join('');
-    }
-
-    // เปิด Modal เพิ่มบ้าน
-    function openAddModal() {
-      document.getElementById('modalTitle').innerText = 'เพิ่มบ้านใหม่';
-      document.getElementById('editHouseholdId').value = '';
-      document.getElementById('houseNo').value = '';
-      document.getElementById('ownerName').value = '';
-      document.getElementById('initialReading').value = '0';
-      document.getElementById('householdModal').classList.remove('hidden');
-    }
-
-    // เปิด Modal แก้ไขบ้าน
-    function openEditModal(id, houseNo, ownerName, initialReading) {
-      document.getElementById('modalTitle').innerText = 'แก้ไขข้อมูลบ้าน';
-      document.getElementById('editHouseholdId').value = id;
-      document.getElementById('houseNo').value = houseNo;
-      document.getElementById('ownerName').value = ownerName;
-      document.getElementById('initialReading').value = initialReading;
-      document.getElementById('householdModal').classList.remove('hidden');
-    }
-
-    // ปิด Modal
-    function closeModal() {
-      document.getElementById('householdModal').classList.add('hidden');
-    }
-
-    // บันทึกข้อมูลบ้าน (เพิ่มหรืออัปเดต)
-    async function saveHousehold() {
-      const id = document.getElementById('editHouseholdId').value;
-      const house_no = document.getElementById('houseNo').value.trim();
-      const owner_name = document.getElementById('ownerName').value.trim();
-      const initial_reading = parseFloat(document.getElementById('initialReading').value) || 0;
-
-      if (!house_no || !owner_name) {
-        alert('กรุณากรอกข้อมูลบ้านเลขที่และชื่อเจ้าของให้ครบถ้วน');
-        return;
-      }
-
-      if (id) {
-        // อัปเดตข้อมูลเดิม
-        const { error } = await supabaseClient
-          .from('households')
-          .update({ house_no, owner_name, initial_reading })
-          .eq('id', id);
-
-        if (error) {
-          alert('เกิดข้อผิดพลาด: ' + error.message);
-        } else {
-          closeModal();
-          loadHouseholds();
-        }
-      } else {
-        // เพิ่มข้อมูลใหม่
-        const { error } = await supabaseClient
-          .from('households')
-          .insert([{ house_no, owner_name, initial_reading, active: true }]);
-
-        if (error) {
-          alert('เกิดข้อผิดพลาด: ' + error.message);
-        } else {
-          closeModal();
-          loadHouseholds();
-        }
-      }
-    }
-
-    // ตั้งค่าช่องเดือนเริ่มต้นเป็นเดือนปัจจุบัน
-    const now = new Date();
-    const currentMonthStr = now.toISOString().slice(0, 7);
-    document.getElementById('filterMonth').value = currentMonthStr;
-
-    // เริ่มต้นทำงาน
-    checkAuth();
-    loadHouseholds();
-  </script>
+const d = new Date();
+$('month').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+init();
+</script>
 </body>
 </html>
