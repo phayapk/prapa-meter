@@ -250,11 +250,12 @@ const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 // ชื่อคอลัมน์ที่ระบบจะลองหาอัตโนมัติ (รองรับหลายแบบ)
 const READ_CANDS = {
   period:    ['period','billing_month','month','reading_month'],
-  value:     ['reading','current_reading','meter_reading','reading_value','value'],
+  value:     ['curr_reading','reading','current_reading','meter_reading','reading_value','value'],
   household: ['household_id','house_id'],
   photo:     ['photo_path','photo_url','photo','image_url','image_path'],
   by:        ['recorded_by','staff_email','staff_name','created_by','user_email'],
-  at:        ['recorded_at','created_at']
+  at:        ['taken_at','recorded_at','created_at'],
+  reset:     ['reset_type']
 };
 const METER_NO_CANDS = ['meter_no','meter_number','meter_id','meter_code'];
 
@@ -269,6 +270,7 @@ const fmt = (n, d = 0) => (n === null || n === undefined || isNaN(n)) ? '-' :
 const ym = v => v ? String(v).slice(0, 7) : '';
 const rPer = r => ym(S.rc.period ? r[S.rc.period] : r[S.rc.at]);
 const rVal = r => num(r[S.rc.value]);
+const rType = r => (S.rc.reset ? r[S.rc.reset] : null) || null;
 const houseNoHtml = h => h.house_no ? esc(h.house_no) : '<span class="text-orange-500 text-xs">ยังไม่ระบุ</span>';
 const byText = v => !v ? '-' : (/^[0-9a-f-]{36}$/i.test(String(v)) ? 'ID ' + String(v).slice(0, 8) : String(v));
 const thTime = v => v ? new Date(v).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-';
@@ -374,7 +376,8 @@ function detectCols() {
     S.rc = {};
     for (const [k, list] of Object.entries(READ_CANDS)) S.rc[k] = list.find(c => c in r) || null;
   } else {
-    S.rc = { period: 'period', value: 'reading', household: 'household_id', photo: null, by: null, at: 'created_at' };
+    S.rc = { period: 'period', value: 'curr_reading', household: 'household_id',
+             photo: 'photo_path', by: null, at: 'taken_at', reset: 'reset_type' };
   }
   const h = S.houses[0] || { house_no: 1, owner_name: 1, initial_reading: 1, active: 1 };
   S.hkeys = new Set(Object.keys(h));
@@ -408,11 +411,25 @@ function computeMonth(month) {
     const prevR = [...list].reverse().find(r => rPer(r) < month);
     const prev = prevR ? rVal(prevR) : (num(h.initial_reading) ?? 0);
     let units = null, flag = '';
-    if (cur) {
-      units = rVal(cur) - prev;
-      if (units < 0 && h.meter_digits) { units += Math.pow(10, Number(h.meter_digits)); flag = 'มิเตอร์วนรอบ'; }
+        if (cur) {
+      const cv = rVal(cur), type = rType(cur), digits = Number(h.meter_digits) || 0;
+
+      if (type === 'new_meter') {
+        // เปลี่ยนมิเตอร์ใหม่: นับหน่วยจากเลขบนมิเตอร์ใหม่ (สมมติว่ามิเตอร์ใหม่เริ่มที่ 0)
+        units = cv;
+        flag = 'เปลี่ยนมิเตอร์ใหม่';
+      } else {
+        units = cv - prev;
+        if (units < 0 && digits) {
+          units += 10 ** digits;
+          flag = type === 'rollover' ? 'มิเตอร์วนรอบ' : 'มิเตอร์วนรอบ (ระบบคำนวณเอง)';
+        } else if (type === 'rollover') {
+          flag = units >= 0 ? 'เลือกวนรอบ แต่เลขไม่ได้ลดลง' : 'วนรอบ แต่ไม่ได้ตั้งจำนวนหลักมิเตอร์';
+        }
+      }
+
       if (units < 0) flag = 'เลขน้อยกว่าครั้งก่อน';
-      else if (units > warn) flag = 'ใช้น้ำสูงผิดปกติ';
+      else if (units > warn) flag = (flag ? flag + ' · ' : '') + 'ใช้น้ำสูงผิดปกติ';
     }
     const amount = (cur && units >= 0) ? calcBill(units) : null;
     return { h, cur, prev, units, amount, flag };
@@ -656,7 +673,7 @@ async function saveSettings() {
     high_usage_warn: Number($('sWarn').value || 100),
     updated_at: new Date().toISOString()
   };
-  const { data, error } = await sb.from('settings').upsert(p).select();
+  const { data, error } = await sb.from('settings').upsert(p, { onConflict: 'id' }).select();
   if (error || !data.length) return toast('บันทึกไม่สำเร็จ' + (error ? ': ' + error.message : ''), false);
   toast('บันทึกอัตราค่าน้ำแล้ว');
   reloadAll();
@@ -691,13 +708,14 @@ async function addStaff() {
 
   if (pass) {
     if (pass.length < 6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', false);
-    // ใช้ client แยก เพื่อไม่ให้แอดมินถูกล็อกเอาต์
-    const tmp = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'tmp-signup' }
-    });
-    const { error } = await tmp.auth.signUp({ email, password: pass });
-    if (error) return toast('สร้างบัญชีล็อกอินไม่สำเร็จ: ' + error.message, false);
+    const { error } = await sb.functions.invoke('create-staff', { body: { email, password: pass } });
+    if (error) {
+      let msg = error.message;
+      try { msg = (await error.context.json()).error || msg; } catch {}
+      return toast('สร้างบัญชีล็อกอินไม่สำเร็จ: ' + msg, false);
+    }
   }
+
 
   const { error } = await sb.from('staff').upsert({ email, full_name, role, active: true }, { onConflict: 'email' });
   if (error) return toast('บันทึกผู้ใช้ไม่สำเร็จ: ' + error.message, false);

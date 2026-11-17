@@ -179,6 +179,19 @@ if (!window.supabase) {
   throw new Error('supabase-js not loaded');
 }
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+// ===== ค่าตั้งจากหลังบ้าน (แคชไว้ใช้ตอนออฟไลน์) =====
+const SETTINGS_KEY = 'meterApp.settings';
+const APP = { high_usage_warn: CONFIG.HIGH_USAGE_WARN };
+try { Object.assign(APP, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch {}
+
+async function loadSettings() {
+  if (!navigator.onLine) return;               // ออฟไลน์ใช้ค่าที่แคชไว้
+  const { data, error } = await sb.from('settings').select('*').eq('id', 1).maybeSingle();
+  if (error || !data) { console.warn('โหลด settings ไม่ได้', error); return; }
+  Object.assign(APP, data);
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(APP));
+}
+const warnLimit = () => Number(APP.high_usage_warn) || CONFIG.HIGH_USAGE_WARN;
 const S = { month:'', households:[], map:{}, queue:[], filter:'todo', cur:null, photo:null, photoUrl:null, pending:null, syncing:false };
 const TYPE_TXT = { '':'ปกติ', rollover:'มิเตอร์วนรอบ', new_meter:'เปลี่ยนมิเตอร์ใหม่' };
 
@@ -374,7 +387,7 @@ $('#btnNext').addEventListener('click', () => {
   $('#cUnits').textContent = units;
   $('#cType').textContent = 'สถานะมิเตอร์: ' + TYPE_TXT[type];
   const w = [];
-  if (units > CONFIG.HIGH_USAGE_WARN) w.push(`⚠ ใช้น้ำ ${units} หน่วย สูงผิดปกติ กรุณาตรวจเลขอีกครั้ง`);
+  if (units > warnLimit()) w.push(`⚠ ใช้น้ำ ${units} หน่วย สูงผิดปกติ กรุณาตรวจเลขอีกครั้ง`);
   if (units === 0) w.push('⚠ ใช้น้ำ 0 หน่วย (บ้านว่างหรือไม่มีคนอยู่?)');
   if (type === 'rollover' && curr >= prev) w.push('⚠ เลือก "วนรอบ" แต่เลขใหม่ไม่ได้น้อยกว่าเลขเดิม ตรวจสอบอีกครั้ง');
   $('#cWarn').innerHTML = w.map(esc).join('<br>');
@@ -411,9 +424,10 @@ async function syncNow(manual) {
   const { data } = await sb.auth.getSession();
   if (!data.session) { if (manual) toast('กรุณาเข้าสู่ระบบก่อน'); return; }
   S.syncing = true; updateNet();
-  let ok = 0, fail = 0;
+  let ok = 0, fail = 0, dup = 0;
   try {
     for (const it of await DB.all()) {
+            if (it.dup) { dup++; continue; }   // รายการที่ซ้ำแล้ว ไม่ต้องส่งซ้ำทุกรอบ
       try {
         let photo_path = null;
         if (it.photo) {
@@ -426,9 +440,21 @@ async function syncNow(manual) {
           household_id: it.householdId, period: it.period, curr_reading: it.reading,
           reset_type: it.resetType, photo_path, taken_at: it.takenAt
         });
-        if (error && error.code !== '23505') throw error;
-        await DB.del(it.id); ok++;
-        if (it.period === period() && S.map[it.householdId]) S.map[it.householdId].done = it.reading;
+        if (error) {
+          if (error.code !== '23505') throw error;
+          // งวดนี้มีเลขในระบบแล้ว ให้ดูว่าตรงกับที่จดไหม
+          const { data: ex } = await sb.from('readings').select('curr_reading')
+            .eq('household_id', it.householdId).eq('period', it.period).maybeSingle();
+          if (!ex || Number(ex.curr_reading) !== Number(it.reading)) {
+            it.dup = true;
+            it.error = `งวดนี้จดไปแล้ว (เลขในระบบ: ${ex?.curr_reading ?? '?'}) ถ้าต้องแก้ ให้แจ้งแอดมินแล้วกด "ลบ" รายการนี้`;
+            await DB.put(it); dup++;
+            if (ex && it.period === period() && S.map[it.householdId]) S.map[it.householdId].done = ex.curr_reading;
+            continue;
+          }
+          // ถ้าเลขตรงกัน แปลว่าเคยส่งสำเร็จแล้ว (เช่น เน็ตหลุดตอนรอตอบกลับ) ลบออกจากคิวได้เลย
+        }
+        await DB.del(it.id); ok++;        if (it.period === period() && S.map[it.householdId]) S.map[it.householdId].done = it.reading;
       } catch (e) {
         it.error = e.message || String(e); await DB.put(it); fail++;
       }
@@ -439,6 +465,7 @@ async function syncNow(manual) {
   }
   if (ok) toast(`✓ ส่งขึ้นระบบสำเร็จ ${ok} รายการ`);
   if (fail) toast(`⚠ ส่งไม่สำเร็จ ${fail} รายการ ดูรายละเอียดที่ "รอส่ง"`, 4000);
+   if (dup) toast(`⚠ มี ${dup} รายการที่งวดนี้จดไปแล้ว ดูที่ "รอส่ง"`, 5000);
 }
 
 // ---------- หน้ารอส่ง ----------
@@ -513,8 +540,11 @@ setInterval(() => { if (S.queue.length) syncNow(); }, 60000);
 async function start() {
   show('scrList');
   if (!S.month) { S.month = bkkMonth(); $('#month').value = S.month; }
-  updateNet(); await refreshQueue(); await loadData(); syncNow();
+  updateNet(); await refreshQueue();
+  await Promise.all([loadData(), loadSettings()]);
+  syncNow();
 }
+
 (async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (navigator.storage?.persist) navigator.storage.persist();
