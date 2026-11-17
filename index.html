@@ -266,9 +266,9 @@ async function loadData() {
   $('#progress').textContent = 'กำลังโหลด...';
   try {
     const hh = await fetchAll(() => sb.from('households')
-      .select('id,house_no,owner_name,meter_no,meter_digits,initial_reading,route_order')
-      .order('route_order', { ascending: true, nullsFirst: false })
-      .order('owner_name').order('id'));
+  .select('id,house_no,owner_name,meter_no,meter_digits,initial_reading,route_order')
+  .order('route_order', { ascending: true, nullsFirst: false })
+  .order('owner_name').order('id'));
     const from = shiftMonth(S.month, -13) + '-01';
     const rd = await fetchAll(() => sb.from('readings')
       .select('household_id,period,curr_reading')
@@ -317,10 +317,10 @@ function renderList() {
     const m = S.map[h.id] || {};
     const tag = st === 'done' ? `<span class="tag ok">✓ ${esc(m.done)}</span>`
               : st === 'pend' ? '<span class="tag pend">⏳ รอส่ง</span>' : '';
-    rows.push(`<div class="item ${st}" data-id="${esc(h.id)}">
-      <div class="ord">${esc(h.route_order ?? '–')}</div>
-      <div class="info"><div class="nm">${esc(h.owner_name)}</div>
-      <div class="mut small">บ้าน ${esc(h.house_no || 'ยังไม่ระบุ')} · มิเตอร์ ${esc(h.meter_no || '-')}</div></div>${tag}</div>`);
+rows.push(`<div class="item ${st}" data-id="${esc(h.id)}">
+  <div class="ord">${esc(h.route_order ?? '–')}</div>
+  <div class="info"><div class="nm">${esc(h.owner_name)}</div>
+  <div class="mut small">บ้าน ${esc(h.house_no || 'ยังไม่ระบุ')} · มิเตอร์ ${esc(h.meter_no || '-')}</div></div>${tag}</div>`);
   });
   const total = S.households.length;
   $('#progress').textContent = `จดแล้ว ${nDone} / ${total} หลัง`;
