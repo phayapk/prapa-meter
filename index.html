@@ -420,11 +420,25 @@ async function aiReadMeter(blob) {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     aiHint('🤖 AI อ่านได้ ' + data.reading + ' ตรวจให้ตรงกับมิเตอร์ก่อนกดถัดไป', '#1d4ed8');
   } catch (e) {
-    console.warn('AI read failed', e);
-    if (seq === aiSeq) aiHint('⚠️ AI อ่านไม่สำเร็จ กรุณากรอกเอง', '#b45309');
+    let detail = '';
+    if (e && e.message === 'timeout') {
+      detail = 'AI ตอบช้าเกิน 20 วินาที';
+    } else if (e && e.context && typeof e.context.json === 'function') {
+      // FunctionsHttpError: e.context คือ Response ที่ Edge Function ส่งกลับมา
+      try {
+        const body = await e.context.json();
+        detail = (body && body.error) ? body.error : '';
+      } catch (_) {}
+      if (!detail && e.context.status) detail = 'HTTP ' + e.context.status;
+    } else if (e && e.name === 'FunctionsFetchError') {
+      detail = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    }
+    console.warn('AI read failed', e, detail);
+    if (seq === aiSeq) {
+      aiHint('⚠️ AI อ่านไม่สำเร็จ' + (detail ? ' (' + detail + ')' : '') + ' กรุณากรอกเอง', '#b45309');
+    }
   }
 }
-
 document.getElementById('photo').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
   const label = document.getElementById('photoLabel');
