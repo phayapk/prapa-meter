@@ -118,6 +118,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
       <img id="preview" class="preview hidden" alt="">
       <label>เลขที่อ่านได้บนมิเตอร์</label>
       <input type="text" id="reading" inputmode="numeric" pattern="[0-9]*" class="numIn" autocomplete="off">
+      <div id="aiHint" style="font-size:14px;margin-top:6px;line-height:1.4"></div>
       <label>สถานะมิเตอร์</label>
       <select id="resetType">
         <option value="">ปกติ</option>
@@ -357,16 +358,84 @@ function openReading(id) {
   $('#resetType').value = ''; $('#readErr').textContent = '';
   $('#preview').classList.add('hidden'); $('#photo').value = '';
   $('#photoLabel').textContent = '📷 ถ่ายรูปมิเตอร์';
+  aiSeq++; aiHint('');
   show('scrRead');
 }
-$('#photo').addEventListener('change', async e => {
+// ===== AI ช่วยอ่านเลขมิเตอร์ =====
+let aiSeq = 0;
+
+function aiHint(text, color) {
+  const h = document.getElementById('aiHint');
+  if (!h) return;
+  h.textContent = text || '';
+  h.style.color = color || '#475569';
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result).split(',')[1]);
+    fr.onerror = () => reject(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+
+async function aiReadMeter(blob) {
+  const seq = ++aiSeq;
+  const houseId = S.cur && S.cur.id;
+  const input = document.getElementById('reading');
+  if (!blob || !input) return;
+  if (!navigator.onLine) { aiHint('📴 ออฟไลน์อยู่ กรอกเลขเองได้เลย'); return; }
+
+  aiHint('🤖 AI กำลังอ่านเลขมิเตอร์...');
+  try {
+    const image = await blobToBase64(blob);
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000));
+    const { data, error } = await Promise.race([
+      sb.functions.invoke('read-meter', { body: { image: image } }),
+      timeout,
+    ]);
+
+    // ถ้าถ่ายรูปใหม่หรือเปลี่ยนไปบ้านอื่นแล้ว ไม่ต้องกรอก
+    if (seq !== aiSeq || !S.cur || S.cur.id !== houseId) return;
+    if (error) throw error;
+
+    if (data.reading == null) {
+      aiHint('⚠️ AI อ่านไม่ได้ ' + (data.note || '') + ' กรุณากรอกเอง', '#b45309');
+      return;
+    }
+    if (data.confidence === 'low') {
+      aiHint('⚠️ AI เดาว่า ' + data.reading + ' แต่ไม่มั่นใจ กรุณาดูมิเตอร์แล้วกรอกเอง', '#b45309');
+      return;
+    }
+    const typed = input.value.trim();
+    if (typed !== '') {
+      const same = Number(typed) === data.reading;
+      aiHint(same ? '✅ AI อ่านได้ ' + data.reading + ' ตรงกับที่กรอก'
+                  : '⚠️ AI อ่านได้ ' + data.reading + ' ไม่ตรงกับที่กรอก (' + typed + ') กรุณาตรวจอีกครั้ง',
+             same ? '#15803d' : '#b45309');
+      return;
+    }
+    input.value = String(data.reading);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    aiHint('🤖 AI อ่านได้ ' + data.reading + ' ตรวจให้ตรงกับมิเตอร์ก่อนกดถัดไป', '#1d4ed8');
+  } catch (e) {
+    console.warn('AI read failed', e);
+    if (seq === aiSeq) aiHint('⚠️ AI อ่านไม่สำเร็จ กรุณากรอกเอง', '#b45309');
+  }
+}
+
+document.getElementById('photo').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
-  $('#photoLabel').textContent = 'กำลังย่อรูป...';
+  const label = document.getElementById('photoLabel');
+  const preview = document.getElementById('preview');
+  label.textContent = 'กำลังย่อรูป...';
   try { S.photo = await compress(f); } catch { S.photo = f; }
   if (S.photoUrl) URL.revokeObjectURL(S.photoUrl);
   S.photoUrl = URL.createObjectURL(S.photo);
-  $('#preview').src = S.photoUrl; $('#preview').classList.remove('hidden');
-  $('#photoLabel').textContent = '📷 ถ่ายใหม่';
+  preview.src = S.photoUrl; preview.classList.remove('hidden');
+  label.textContent = '📷 ถ่ายใหม่';
+  aiReadMeter(S.photo);
 });
 $('#btnNext').addEventListener('click', () => {
   const h = S.cur, m = S.map[h.id] || {};
