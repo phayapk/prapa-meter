@@ -390,7 +390,7 @@ async function aiReadMeter(blob) {
   aiHint('🤖 AI กำลังอ่านเลขมิเตอร์...');
   try {
     const image = await blobToBase64(blob);
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 20000));
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 40000));
     const { data, error } = await Promise.race([
       sb.functions.invoke('read-meter', { body: { image: image } }),
       timeout,
@@ -422,7 +422,7 @@ async function aiReadMeter(blob) {
   } catch (e) {
     let detail = '';
     if (e && e.message === 'timeout') {
-      detail = 'AI ตอบช้าเกิน 20 วินาที';
+      detail = 'AI ตอบช้าเกิน 40 วินาที';
     } else if (e && e.context && typeof e.context.json === 'function') {
       // FunctionsHttpError: e.context คือ Response ที่ Edge Function ส่งกลับมา
       try {
