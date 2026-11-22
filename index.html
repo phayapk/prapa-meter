@@ -59,7 +59,13 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 </style>
 </head>
 <body>
-
+   <div id="camBox" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column">
+     <video id="camVideo" playsinline autoplay muted style="flex:1;width:100%;min-height:0;object-fit:contain"></video>
+     <div style="display:flex;gap:12px;padding:16px;justify-content:center">
+       <button type="button" id="camCancel" style="padding:12px 20px;font-size:16px">ยกเลิก</button>
+       <button type="button" id="camShot" style="padding:12px 28px;font-size:18px">📸 ถ่าย</button>
+     </div>
+   </div>
 <header id="topbar" class="hidden">
   <h1>💧 จดมิเตอร์</h1>
   <span id="net" class="net">ออนไลน์</span>
@@ -439,8 +445,8 @@ async function aiReadMeter(blob) {
     }
   }
 }
-document.getElementById('photo').addEventListener('change', async e => {
-  const f = e.target.files[0]; if (!f) return;
+// ---------- ประมวลผลรูป (ใช้ร่วมกันทั้งกล้องในหน้าเว็บและช่องเลือกรูป) ----------
+async function handlePhoto(f) {
   const label = document.getElementById('photoLabel');
   const preview = document.getElementById('preview');
   label.textContent = 'กำลังย่อรูป...';
@@ -450,6 +456,51 @@ document.getElementById('photo').addEventListener('change', async e => {
   preview.src = S.photoUrl; preview.classList.remove('hidden');
   label.textContent = '📷 ถ่ายใหม่';
   aiReadMeter(S.photo);
+}
+
+// ช่องเลือกรูปแบบเดิม (ใช้เป็นตัวสำรองเมื่อเปิดกล้องในหน้าเว็บไม่ได้)
+document.getElementById('photo').addEventListener('change', e => {
+  const f = e.target.files[0]; if (f) handlePhoto(f);
+  e.target.value = '';   // ให้เลือกรูปเดิมซ้ำได้
+});
+
+// ---------- กล้องในหน้าเว็บ บังคับใช้กล้องหลัง ----------
+let camStream = null;
+async function openCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+  } catch (err) { console.warn('camera', err); return false; }
+  const v = document.getElementById('camVideo');
+  v.srcObject = camStream;
+  document.getElementById('camBox').style.display = 'flex';
+  await v.play().catch(() => {});
+  return true;
+}
+function closeCamera() {
+  if (camStream) camStream.getTracks().forEach(t => t.stop());
+  camStream = null;
+  document.getElementById('camBox').style.display = 'none';
+}
+document.getElementById('camCancel').onclick = closeCamera;
+document.getElementById('camShot').onclick = () => {
+  const v = document.getElementById('camVideo');
+  if (!v.videoWidth) return;   // กล้องยังไม่พร้อม
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  c.toBlob(b => {
+    closeCamera();
+    if (b) handlePhoto(new File([b], 'meter.jpg', { type: 'image/jpeg' }));
+  }, 'image/jpeg', 0.9);
+};
+document.getElementById('photoLabel').addEventListener('click', async e => {
+  e.preventDefault();                                   // ไม่เปิดช่องเลือกรูปแบบเดิม
+  const ok = await openCamera();
+  if (!ok) document.getElementById('photo').click();    // เครื่องไม่รองรับ ใช้แบบเดิม
 });
 $('#btnNext').addEventListener('click', () => {
   const h = S.cur, m = S.map[h.id] || {};
