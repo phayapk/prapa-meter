@@ -615,10 +615,15 @@ async function saveReading() {
 }
 
 async function delReading(id) {
-  if (!confirm('ลบผลการจดนี้? (สตาฟจะต้องจดบ้านนี้ใหม่)')) return;
+  if (!confirm('ลบผลการจดนี้? (สตาฟจะต้องจดบ้านนี้ใหม่ และบิลของรายการนี้จะถูกลบด้วย)')) return;
   const { error } = await sb.from('readings').delete().eq('id', id);
-  if (error) return toast('ลบไม่สำเร็จ: ' + error.message, false);
-  toast('ลบแล้ว');
+  if (error) {
+    console.error('delete reading', error);
+    return toast(error.code === '23503'
+      ? 'ลบไม่ได้ เพราะรายการนี้ถูกใช้อยู่ในข้อมูลอื่น (เช่น บิลค่าน้ำ)'
+      : 'ลบไม่สำเร็จ: ' + error.message, false);
+  }
+  toast('ลบผลการจดแล้ว');
   reloadAll();
 }
 
@@ -708,12 +713,13 @@ async function addStaff() {
 
   if (pass) {
     if (pass.length < 6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', false);
-    const { error } = await sb.functions.invoke('create-staff', { body: { email, password: pass } });
-    if (error) {
-      let msg = error.message;
-      try { msg = (await error.context.json()).error || msg; } catch {}
-      return toast('สร้างบัญชีล็อกอินไม่สำเร็จ: ' + msg, false);
-    }
+const { error } = await sb.functions.invoke('create-staff', { body: { email, password: pass } });
+if (error) {
+  let detail = '';
+  try { detail = (await error.context.json()).error || ''; } catch (_) {}
+  console.error('create-staff', error, detail);
+  return toast('สร้างบัญชีล็อกอินไม่สำเร็จ: ' + (detail || error.message), false);
+}
   }
 
 
