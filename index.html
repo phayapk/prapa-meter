@@ -59,13 +59,20 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 </style>
 </head>
 <body>
-   <div id="camBox" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column">
-     <video id="camVideo" playsinline autoplay muted style="flex:1;width:100%;min-height:0;object-fit:contain"></video>
-     <div style="display:flex;gap:12px;padding:16px;justify-content:center">
-       <button type="button" id="camCancel" style="padding:12px 20px;font-size:16px">ยกเลิก</button>
-       <button type="button" id="camShot" style="padding:12px 28px;font-size:18px">📸 ถ่าย</button>
-     </div>
-   </div>
+<div id="camBox" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column">
+  <div id="camWrap" style="position:relative;flex:1;min-height:0;overflow:hidden">
+    <video id="camVideo" playsinline autoplay muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></video>
+    <div id="camGuide" style="position:absolute;border:3px solid #22c55e;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none"></div>
+    <div style="position:absolute;left:0;right:0;top:12px;padding:0 12px;text-align:center;color:#fff;font-size:15px;text-shadow:0 1px 3px #000">
+      ให้แถวตัวเลขมิเตอร์อยู่ในกรอบเขียว<br>ถ้ามีแสงสะท้อน ให้เอียงมือถือเล็กน้อย
+    </div>
+  </div>
+  <div style="display:flex;gap:12px;padding:16px;justify-content:center">
+    <button type="button" id="camCancel" style="padding:12px 20px;font-size:16px">ยกเลิก</button>
+    <button type="button" id="camTorch" style="padding:12px 20px;font-size:16px;display:none">🔦 ไฟ</button>
+    <button type="button" id="camShot" style="padding:12px 28px;font-size:18px">📸 ถ่าย</button>
+  </div>
+</div>
 <header id="topbar" class="hidden">
   <h1>💧 จดมิเตอร์</h1>
   <span id="net" class="net">ออนไลน์</span>
@@ -386,6 +393,17 @@ function blobToBase64(blob) {
   });
 }
 
+function aiContext() {
+  const h = S.cur || {};
+  const digits = Number(h.meter_digits) || 4;
+  let prev = null;
+  try {
+    prev = null;   // ← แทน null ด้วยนิพจน์ที่ใช้หา prev (ดูคำอธิบายด้านล่าง)
+  } catch (_) {}
+  const warn = typeof warnLimit === 'function' ? Number(warnLimit()) || 100 : 100;
+  return { digits, prev, maxUse: Math.max(warn * 3, 100) };
+}
+
 async function aiReadMeter(blob) {
   const seq = ++aiSeq;
   const houseId = S.cur && S.cur.id;
@@ -398,7 +416,7 @@ async function aiReadMeter(blob) {
     const image = await blobToBase64(blob);
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 60000));
     const { data, error } = await Promise.race([
-      sb.functions.invoke('read-meter', { body: { image: image } }),
+      sb.functions.invoke('read-meter', { body: { image: image, ...aiContext() } }),
       timeout,
     ]);
 
@@ -424,7 +442,10 @@ async function aiReadMeter(blob) {
     }
     input.value = String(data.reading);
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    aiHint('🤖 AI อ่านได้ ' + data.reading + ' ตรวจให้ตรงกับมิเตอร์ก่อนกดถัดไป', '#1d4ed8');
+const mid = data.confidence === 'medium';
+aiHint('🤖 AI อ่านได้ ' + data.reading +
+       (mid ? ' (ไม่มั่นใจเต็มที่: ' + (data.note || '') + ')' : '') +
+       ' ตรวจให้ตรงกับมิเตอร์ก่อนกดถัดไป', mid ? '#b45309' : '#1d4ed8');
   } catch (e) {
     let detail = '';
     if (e && e.message === 'timeout') {
@@ -445,8 +466,8 @@ async function aiReadMeter(blob) {
     }
   }
 }
-// ---------- ประมวลผลรูป (ใช้ร่วมกันทั้งกล้องในหน้าเว็บและช่องเลือกรูป) ----------
-async function handlePhoto(f) {
+// ---------- ประมวลผลรูป: เก็บรูปเต็มเป็นหลักฐาน ส่งรูปที่ตัดแล้วให้ AI ----------
+async function handlePhoto(f, aiBlob) {
   const label = document.getElementById('photoLabel');
   const preview = document.getElementById('preview');
   label.textContent = 'กำลังย่อรูป...';
@@ -455,17 +476,72 @@ async function handlePhoto(f) {
   S.photoUrl = URL.createObjectURL(S.photo);
   preview.src = S.photoUrl; preview.classList.remove('hidden');
   label.textContent = '📷 ถ่ายใหม่';
-  aiReadMeter(S.photo);
+  let forAI = S.photo;
+  if (aiBlob) { try { forAI = await compress(aiBlob, 1280, 0.85); } catch { forAI = aiBlob; } }
+  aiReadMeter(forAI);
 }
 
-// ช่องเลือกรูปแบบเดิม (ใช้เป็นตัวสำรองเมื่อเปิดกล้องในหน้าเว็บไม่ได้)
 document.getElementById('photo').addEventListener('change', e => {
   const f = e.target.files[0]; if (f) handlePhoto(f);
-  e.target.value = '';   // ให้เลือกรูปเดิมซ้ำได้
+  e.target.value = '';
 });
 
-// ---------- กล้องในหน้าเว็บ บังคับใช้กล้องหลัง ----------
-let camStream = null;
+// ---------- ตรวจคุณภาพรูป (ปรับเกณฑ์ได้ที่ QC) ----------
+const QC = { dark: 55, glare: 0.05, blur: 35 };
+function photoQuality(c) {
+  const W = 320, H = Math.max(1, Math.round(c.height * W / c.width));
+  const t = document.createElement('canvas'); t.width = W; t.height = H;
+  const x = t.getContext('2d', { willReadFrequently: true }); x.drawImage(c, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, g = new Float32Array(W * H);
+  let sum = 0, bright = 0;
+  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
+    const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    g[j] = y; sum += y; if (y >= 250) bright++;
+  }
+  let ls = 0, lq = 0, n = 0;
+  for (let yy = 1; yy < H - 1; yy++) for (let xx = 1; xx < W - 1; xx++) {
+    const k = yy * W + xx, l = 4 * g[k] - g[k - 1] - g[k + 1] - g[k - W] - g[k + W];
+    ls += l; lq += l * l; n++;
+  }
+  const mean = sum / g.length, glare = bright / g.length, sharp = n ? lq / n - (ls / n) ** 2 : 0;
+  const problems = [];
+  if (mean < QC.dark) problems.push('มืดเกินไป (กดปุ่ม 🔦 ไฟ)');
+  if (glare > QC.glare) problems.push('มีแสงสะท้อน (เอียงมือถือเล็กน้อย)');
+  if (sharp < QC.blur) problems.push('ภาพเบลอ (ถือให้นิ่ง รอให้โฟกัส)');
+  return { mean: Math.round(mean), glare: +glare.toFixed(3), sharp: Math.round(sharp), problems };
+}
+
+// เพิ่ม contrast อัตโนมัติ (ช่วยตอนกระจกหมอง) ทำเฉพาะรูปที่ส่ง AI
+function autoContrast(c) {
+  const x = c.getContext('2d', { willReadFrequently: true });
+  const img = x.getImageData(0, 0, c.width, c.height), d = img.data, hist = new Uint32Array(256);
+  for (let i = 0; i < d.length; i += 4) hist[(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0]++;
+  const total = d.length / 4; let lo = 0, hi = 255, acc = 0;
+  while (lo < 255 && (acc += hist[lo]) < total * 0.01) lo++;
+  acc = 0; while (hi > 0 && (acc += hist[hi]) < total * 0.01) hi--;
+  if (hi - lo >= 150 || hi <= lo) return;   // contrast ดีอยู่แล้ว
+  const s = 255 / (hi - lo);
+  for (let i = 0; i < d.length; i += 4) { d[i] = (d[i] - lo) * s; d[i + 1] = (d[i + 1] - lo) * s; d[i + 2] = (d[i + 2] - lo) * s; }
+  x.putImageData(img, 0, 0);
+}
+
+// ---------- กล้องหลัง + กรอบเล็ง + ไฟฉาย ----------
+let camStream = null, torchOn = false;
+function guideRect(vw, vh) {               // กรอบเล็ง (พิกัดในภาพจริง)
+  let w = vw * 0.86, h = w * 0.5;
+  if (h > vh * 0.9) { h = vh * 0.9; w = h / 0.5; }
+  return { x: (vw - w) / 2, y: (vh - h) / 2, w, h };
+}
+function positionGuide() {
+  const v = document.getElementById('camVideo'), wrap = document.getElementById('camWrap');
+  if (!v.videoWidth) return;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const s = Math.min(W / v.videoWidth, H / v.videoHeight);
+  const dx = (W - v.videoWidth * s) / 2, dy = (H - v.videoHeight * s) / 2;
+  const r = guideRect(v.videoWidth, v.videoHeight), g = document.getElementById('camGuide').style;
+  g.left = dx + r.x * s + 'px'; g.top = dy + r.y * s + 'px';
+  g.width = r.w * s + 'px'; g.height = r.h * s + 'px';
+}
 async function openCamera() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
   try {
@@ -474,33 +550,67 @@ async function openCamera() {
       audio: false,
     });
   } catch (err) { console.warn('camera', err); return false; }
+  const track = camStream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  if (caps.focusMode && caps.focusMode.includes('continuous')) {
+    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  }
+  torchOn = false;
+  const tb = document.getElementById('camTorch');
+  tb.textContent = '🔦 ไฟ'; tb.style.display = caps.torch ? '' : 'none';
+
   const v = document.getElementById('camVideo');
   v.srcObject = camStream;
+  v.onloadedmetadata = positionGuide;
+  window.addEventListener('resize', positionGuide);
   document.getElementById('camBox').style.display = 'flex';
   await v.play().catch(() => {});
+  positionGuide();
   return true;
 }
 function closeCamera() {
   if (camStream) camStream.getTracks().forEach(t => t.stop());
   camStream = null;
+  window.removeEventListener('resize', positionGuide);
   document.getElementById('camBox').style.display = 'none';
 }
 document.getElementById('camCancel').onclick = closeCamera;
-document.getElementById('camShot').onclick = () => {
+document.getElementById('camTorch').onclick = async () => {
+  const t = camStream && camStream.getVideoTracks()[0]; if (!t) return;
+  torchOn = !torchOn;
+  try { await t.applyConstraints({ advanced: [{ torch: torchOn }] }); } catch (_) { torchOn = !torchOn; }
+  document.getElementById('camTorch').textContent = torchOn ? '🔦 ปิดไฟ' : '🔦 ไฟ';
+};
+document.getElementById('camShot').onclick = async () => {
   const v = document.getElementById('camVideo');
-  if (!v.videoWidth) return;   // กล้องยังไม่พร้อม
-  const c = document.createElement('canvas');
-  c.width = v.videoWidth; c.height = v.videoHeight;
-  c.getContext('2d').drawImage(v, 0, 0);
-  c.toBlob(b => {
-    closeCamera();
-    if (b) handlePhoto(new File([b], 'meter.jpg', { type: 'image/jpeg' }));
-  }, 'image/jpeg', 0.9);
+  if (!v.videoWidth) return;
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const full = document.createElement('canvas'); full.width = vw; full.height = vh;
+  full.getContext('2d').drawImage(v, 0, 0);
+
+  // ตัดเฉพาะกรอบเล็ง (เผื่อขอบ 10%)
+  const r = guideRect(vw, vh), pad = 0.1;
+  const x = Math.max(0, r.x - r.w * pad), y = Math.max(0, r.y - r.h * pad);
+  const w = Math.min(vw - x, r.w * (1 + 2 * pad)), h = Math.min(vh - y, r.h * (1 + 2 * pad));
+  const crop = document.createElement('canvas'); crop.width = Math.round(w); crop.height = Math.round(h);
+  crop.getContext('2d', { willReadFrequently: true }).drawImage(full, x, y, w, h, 0, 0, crop.width, crop.height);
+
+  const q = photoQuality(crop);
+  console.log('photo quality', q);
+  if (q.problems.length &&
+      confirm('รูปนี้อาจทำให้ AI อ่านพลาด:\n- ' + q.problems.join('\n- ') +
+              '\n\nกด OK เพื่อถ่ายใหม่ หรือ Cancel เพื่อใช้รูปนี้')) return;   // กล้องยังเปิดอยู่
+
+  autoContrast(crop);
+  const toBlob = (c, qq) => new Promise(res => c.toBlob(res, 'image/jpeg', qq));
+  const [fb, cb] = await Promise.all([toBlob(full, 0.9), toBlob(crop, 0.92)]);
+  closeCamera();
+  if (fb) handlePhoto(new File([fb], 'meter.jpg', { type: 'image/jpeg' }), cb);
 };
 document.getElementById('photoLabel').addEventListener('click', async e => {
-  e.preventDefault();                                   // ไม่เปิดช่องเลือกรูปแบบเดิม
+  e.preventDefault();
   const ok = await openCamera();
-  if (!ok) document.getElementById('photo').click();    // เครื่องไม่รองรับ ใช้แบบเดิม
+  if (!ok) document.getElementById('photo').click();
 });
 $('#btnNext').addEventListener('click', () => {
   const h = S.cur, m = S.map[h.id] || {};
