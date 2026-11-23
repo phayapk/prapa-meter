@@ -738,10 +738,19 @@ async function updStaff(id, patch) {
 }
 
 async function delStaff(id) {
-  if (!confirm('ลบผู้ใช้นี้ออกจากรายชื่อ?')) return;
+  const u = S.staff.find(x => String(x.id) === String(id)) || {};
+  const who = (u.full_name || '-') + ' (' + (u.email || '') + ')';
+  const ans = prompt(
+    'ยืนยันการลบผู้ใช้\n\n' + who +
+    '\nสิทธิ์: ' + (u.role === 'admin' ? 'แอดมิน' : 'สตาฟ') +
+    '\n\nพิมพ์คำว่า  ลบ  แล้วกด OK เพื่อยืนยัน'
+  );
+  if (ans === null) return;                       // กดยกเลิก
+  if (ans.trim() !== 'ลบ') return toast('ยกเลิกการลบ (พิมพ์ไม่ตรง)', false);
+
   const { error } = await sb.from('staff').delete().eq('id', id);
   if (error) return toast('ลบไม่สำเร็จ: ' + error.message, false);
-  toast('ลบแล้ว');
+  toast('ลบ ' + (u.full_name || u.email) + ' แล้ว (ถ้าจะเพิ่มกลับ ให้เว้นช่องรหัสผ่านว่าง)');
   reloadAll();
 }
 
