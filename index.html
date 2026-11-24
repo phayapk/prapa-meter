@@ -396,13 +396,12 @@ function blobToBase64(blob) {
 function aiContext() {
   const h = S.cur || {};
   const digits = Number(h.meter_digits) || 4;
-  let prev = null;
-  try {
-    prev = null;   // ← แทน null ด้วยนิพจน์ที่ใช้หา prev (ดูคำอธิบายด้านล่าง)
-  } catch (_) {}
-  const warn = typeof warnLimit === 'function' ? Number(warnLimit()) || 100 : 100;
-  return { digits, prev, maxUse: Math.max(warn * 3, 100) };
+  const m = S.map[h.id] || {};
+  const prev = (m.prev === null || m.prev === undefined || m.prev === '') ? null : Number(m.prev);
+  const warn = Number(warnLimit()) || 100;
+  return { digits, prev: Number.isFinite(prev) ? prev : null, maxUse: Math.max(warn * 3, 100) };
 }
+
 
 async function aiReadMeter(blob) {
   const seq = ++aiSeq;
