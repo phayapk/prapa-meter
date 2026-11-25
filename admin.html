@@ -19,6 +19,64 @@
   td{padding:.6rem .75rem;border-top:1px solid #f1f5f9;font-size:.875rem;vertical-align:top}
   @media print{.no-print{display:none!important} body{background:#fff}}
 </style>
+<script>
+(function () {
+  var t = localStorage.getItem('adminTheme') ||
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = t;
+})();
+function toggleTheme() {
+  var d = document.documentElement;
+  d.dataset.theme = d.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('adminTheme', d.dataset.theme); themeLabel();
+}
+function themeLabel() {
+  var b = document.getElementById('themeBtn');
+  if (b) b.textContent = document.documentElement.dataset.theme === 'dark' ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด';
+}
+document.addEventListener('DOMContentLoaded', themeLabel);
+</script>
+<style id="themeGold">
+:root{--g-bg:#f7f1e6;--g-card:#fffdf8;--g-ink:#2d2115;--g-mut:#7b6a52;--g-line:#e7dac2;--g-th:#f3e8d3;--g-pri:#8a5a19;--g-gold:#c9a227;--g-ok:#4d7c3a;--g-bad:#b4412f;--g-inp:#fff;--g-h1:#4a2f14;--g-h2:#8a5a19;--g-soft:rgba(201,162,39,.12)}
+[data-theme=dark]{color-scheme:dark;--g-bg:#15110c;--g-card:#211a12;--g-ink:#f1e6d2;--g-mut:#b5a386;--g-line:#3a2e20;--g-th:#2a2117;--g-pri:#c9973a;--g-gold:#e0bd5a;--g-ok:#6ea85a;--g-bad:#e06a55;--g-inp:#1a140e;--g-h1:#0f0b07;--g-h2:#3b2814;--g-soft:rgba(224,189,90,.10)}
+
+html,body{background:var(--g-bg)!important;color:var(--g-ink)!important}
+header{background:linear-gradient(135deg,var(--g-h1),var(--g-h2))!important;color:#fff!important;border-bottom:3px solid var(--g-gold)}
+header a,header button{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;min-width:124px;height:42px;padding:0 14px!important;border-radius:10px!important;background:rgba(255,255,255,.14)!important;color:#fff!important;border:1.5px solid rgba(255,255,255,.35)!important;font-weight:700;font-size:14px;text-decoration:none!important;white-space:nowrap;cursor:pointer}
+header a:hover,header button:hover{background:rgba(255,255,255,.24)!important}
+
+nav.border-b{background:var(--g-card)!important;border-color:var(--g-line)!important}
+.tab{color:var(--g-mut)!important;min-height:48px}
+.tab.active{color:var(--g-pri)!important;border-color:var(--g-gold)!important}
+
+.card,.card-t{background:var(--g-card)!important;color:var(--g-ink)!important;border:1px solid var(--g-line)}
+.inp,select,textarea,input:not([type=checkbox]):not([type=radio]):not([type=file]){background:var(--g-inp)!important;color:var(--g-ink)!important;border:1.5px solid var(--g-line)!important;border-radius:10px!important;min-height:42px}
+.inp:focus,select:focus,input:focus{outline:none;border-color:var(--g-gold)!important;box-shadow:0 0 0 3px var(--g-soft)}
+th{background:var(--g-th)!important;color:var(--g-mut)!important}
+td{border-top-color:var(--g-line)!important}
+tbody tr:hover td{background:var(--g-soft)}
+td:last-child{white-space:nowrap}
+
+.btn{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;min-height:42px;min-width:100px;padding:0 16px!important;border-radius:10px!important;font-weight:700;font-size:15px!important;border:1.5px solid transparent;white-space:nowrap;cursor:pointer;transition:filter .15s}
+.btn:hover{filter:brightness(1.08)}
+td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
+.btn.bg-blue-600{background:var(--g-pri)!important;color:#fff!important}
+.btn.bg-green-600{background:var(--g-ok)!important;color:#fff!important}
+.btn.bg-red-500{background:transparent!important;color:var(--g-bad)!important;border-color:var(--g-bad)!important}
+.btn.bg-gray-200{background:transparent!important;color:var(--g-ink)!important;border-color:var(--g-line)!important}
+
+.bg-white,.bg-gray-50,.bg-gray-100{background:var(--g-card)!important}
+.text-gray-400,.text-gray-500,.text-gray-600{color:var(--g-mut)!important}
+.text-gray-700,.text-gray-800,.text-gray-900{color:var(--g-ink)!important}
+.text-blue-600,.text-blue-700{color:var(--g-pri)!important}
+.border-gray-200,.border-gray-300{border-color:var(--g-line)!important}
+[data-theme=dark] .bg-blue-50,[data-theme=dark] .bg-green-50,[data-theme=dark] .bg-red-50,
+[data-theme=dark] .bg-yellow-50,[data-theme=dark] .bg-amber-50,[data-theme=dark] .bg-orange-50{background:var(--g-soft)!important}
+[data-theme=dark] option{background:#211a12;color:#f1e6d2}
+[data-theme=dark] img{opacity:.95}
+
+@media print{html,body{background:#fff!important;color:#000!important}}
+</style>
 </head>
 <body class="bg-gray-100 text-gray-800 min-h-screen">
 
@@ -62,7 +120,8 @@
       <div class="flex gap-2">
         <a href="index.html" class="btn bg-white/20 hover:bg-white/30">📱 หน้าจดมิเตอร์</a>
 <a href="bills.html" style="padding:8px 12px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none">🧾 ออกบิล/ใบเสร็จ</a>
-<a href="pay.html" style="padding:8px 12px;background:#0f766e;color:#fff;border-radius:8px;text-decoration:none">💰 รับเงิน</a>        
+<a href="pay.html" style="padding:8px 12px;background:#0f766e;color:#fff;border-radius:8px;text-decoration:none">💰 รับเงิน</a>  
+<button type="button" id="themeBtn" onclick="toggleTheme()">🌙 โหมดมืด</button>      
         <button onclick="logout()" class="btn bg-red-500 hover:bg-red-600">ออกจากระบบ</button>
       </div>
     </div>
@@ -101,7 +160,7 @@
     <!-- TAB: ข้อมูลบ้าน -->
     <section id="tab-house" class="hidden space-y-4">
       <div class="card flex flex-wrap gap-2 items-center">
-        <input id="houseSearch" class="inp" style="flex:1;min-width:200px" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์">
+        <input id="houseSearch" class="inp" style="flex:1;min-width:200px" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / หมายเลขมิเตอร์">
         <select id="houseFilter" class="inp" style="width:auto">
           <option value="all">ทั้งหมด</option>
           <option value="active">ใช้งาน</option>
@@ -115,7 +174,7 @@
       <div class="card-t">
         <table>
           <thead><tr>
-            <th>บ้านเลขที่</th><th>ชื่อเจ้าของ</th><th id="thMeterNo">เลขมิเตอร์</th>
+            <th>บ้านเลขที่</th><th>ชื่อเจ้าของ</th><th id="thMeterNo">หมายเลขมิเตอร์</th>
             <th>เลขตั้งต้น</th><th>จดล่าสุด</th><th>สถานะ</th><th style="text-align:center">จัดการ</th>
           </tr></thead>
           <tbody id="houseBody"></tbody>
@@ -202,9 +261,9 @@
       <input type="hidden" id="hId">
       <label class="block text-sm">บ้านเลขที่<input id="hNo" class="inp mt-1" placeholder="เช่น 12/3"></label>
       <label class="block text-sm">ชื่อ-สกุล เจ้าของบ้าน *<input id="hOwner" class="inp mt-1"></label>
-      <label id="wrapMeterNo" class="block text-sm">เลขมิเตอร์ / รหัสมิเตอร์<input id="hMeterNo" class="inp mt-1"></label>
+      <label id="wrapMeterNo" class="block text-sm">หมายเลขมิเตอร์<input id="hMeterNo" class="inp mt-1"></label>
       <label id="wrapDigits" class="block text-sm">จำนวนหลักของมิเตอร์ (ใช้คำนวณตอนมิเตอร์วนรอบ)<input id="hDigits" type="number" min="1" max="9" class="inp mt-1" placeholder="เช่น 4"></label>
-      <label class="block text-sm">เลขมิเตอร์ตั้งต้น<input id="hInit" type="number" step="0.01" class="inp mt-1"></label>
+      <label class="block text-sm">เลขที่อ่านได้ตั้งต้น<input id="hInit" type="number" step="0.01" class="inp mt-1"></label>
       <label class="flex items-center gap-2 text-sm"><input id="hActive" type="checkbox"> เปิดใช้งาน (แสดงในหน้าจดมิเตอร์)</label>
       <div class="flex justify-end gap-2 pt-3 border-t">
         <button onclick="closeModal('houseModal')" class="btn bg-gray-200">ยกเลิก</button>
@@ -221,7 +280,7 @@
       <h3 class="text-lg font-bold">แก้ไขเลขมิเตอร์</h3>
       <input type="hidden" id="rId">
       <p id="rInfo" class="text-sm text-gray-600"></p>
-      <label class="block text-sm">เลขมิเตอร์ครั้งนี้<input id="rValue" type="number" step="0.01" class="inp mt-1"></label>
+      <label class="block text-sm">เลขที่อ่านได้ครั้งนี้<input id="rValue" type="number" step="0.01" class="inp mt-1"></label>
       <div class="flex justify-end gap-2 pt-3 border-t">
         <button onclick="closeModal('readModal')" class="btn bg-gray-200">ยกเลิก</button>
         <button onclick="saveReading()" class="btn bg-blue-600 text-white">บันทึก</button>

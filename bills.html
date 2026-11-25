@@ -13,23 +13,29 @@
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #sigPrev{height:56px;border:1px dashed #cbd5e1;border-radius:8px;display:none;background:#fff}
   .sheet{width:210mm;height:297mm;margin:12px auto;background:#fff;display:grid;grid-template-columns:105mm 105mm;grid-template-rows:148.5mm 148.5mm;box-shadow:0 2px 8px rgba(0,0,0,.2)}
-  .slip{box-sizing:border-box;padding:6mm 7mm;border:.2mm dashed #9ca3af;overflow:hidden;display:flex;flex-direction:column;font-family:Sarabun,sans-serif;font-size:10pt;line-height:1.55;color:#111}
+  .slip{box-sizing:border-box;padding:6mm 7mm;border:.2mm dashed #9ca3af;overflow:hidden;display:flex;flex-direction:column;font-family:Sarabun,sans-serif;font-size:10pt;line-height:1.5;color:#111}
   .slip .hd{text-align:center;border-bottom:.3mm solid #111;padding-bottom:1.5mm;margin-bottom:2mm}
   .slip .hd .v{font-size:8.5pt;line-height:1.75}
   .slip .hd .t{font-size:13pt;font-weight:700;line-height:1.7;margin-top:.5mm}
   .slip .meta{display:flex;justify-content:space-between;font-size:9.5pt}
-  .slip .who{margin:1mm 0}
-  .slip .who b{font-size:11pt}
-  .slip table{width:100%;border-collapse:collapse;margin:1mm 0}
-  .slip td{padding:.3mm 0}.slip td:last-child{text-align:right}
+  .slip .who{margin:1mm 0 .5mm}
+  .slip .who b{font-size:11.5pt}
+  .slip table{width:100%;border-collapse:collapse;margin:.5mm 0}
+  .slip td{padding:.2mm 0;vertical-align:baseline}
+  .slip td.n{text-align:right;white-space:nowrap}
+  .slip td.u{width:17mm;padding-left:1.5mm;font-size:8.5pt;color:#444;white-space:nowrap}
   .slip tr.tot td{font-size:12.5pt;font-weight:700;border-top:.3mm solid #111;padding-top:1mm}
-  .slip .pay{margin-top:auto;text-align:center;font-size:7.5pt}
-  .slip .qrs{display:flex;justify-content:center;gap:4mm}
-  .slip img.qr{width:28mm;height:28mm;image-rendering:pixelated}
-  .slip .qrs.two img.qr{width:22mm;height:22mm}
-  .slip .bank{border:.2mm solid #999;border-radius:1.5mm;padding:1mm;margin-top:1mm;font-size:8.5pt}
+  .slip tr.tot td.u{font-size:10pt;color:#111}
+  .slip .note{font-size:7pt;color:#555;text-align:right}
+  .slip .pay{margin-top:auto;text-align:center;font-size:7pt;line-height:1.35}
+  .slip .qrs{display:flex;justify-content:center;gap:3mm}
+  .slip .qrs>div{max-width:31mm}
+  .slip .qrs img.qr{display:block;margin:0 auto .5mm;image-rendering:pixelated}
+  .slip .qrs.q1 img.qr{width:28mm;height:28mm}
+  .slip .qrs.q2 img.qr{width:23mm;height:23mm}
+  .slip .qrs.q3 img.qr{width:19mm;height:19mm}
   .slip img.vqr{width:15mm;height:15mm;image-rendering:pixelated}
-  .slip .word{text-align:center;font-size:9pt;background:#f3f4f6;padding:1mm}
+  .slip .word{text-align:center;font-size:9pt;background:#f3f4f6;padding:1mm;margin-top:1mm}
   .slip .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:3mm;margin-top:auto;font-size:8pt}
   .slip .sig{text-align:center;font-size:9pt}.slip .sig img{height:13mm;max-width:45mm;display:block;margin:0 auto}
   @page{size:A4;margin:0}
@@ -58,9 +64,9 @@
     <div class="chips">
       <label class="chip"><input type="checkbox" id="optPhone"> QR พร้อมเพย์ (เบอร์มือถือ)</label>
       <label class="chip"><input type="checkbox" id="optTax"> QR พร้อมเพย์ (เลขบัตรประชาชน)</label>
-      <label class="chip"><input type="checkbox" id="optBank"> เลขบัญชีธนาคาร</label>
+      <label class="chip"><input type="checkbox" id="optBank"> QR บัญชีธนาคาร</label>
     </div>
-    <p class="muted small">QR ใส่ได้สูงสุด 2 อันต่อบิล ส่วนเลขบัญชีธนาคารแสดงเป็นตัวอักษร</p>
+    <p class="muted small">เลือกได้หลายช่องทาง ถ้าเลือกครบ 3 อัน QR จะเล็กลง · สแกนทดสอบด้วยแอปธนาคารก่อนพิมพ์จริง</p>
 
     <h2>3. พิมพ์</h2>
     <div class="chips"><label class="chip"><input type="checkbox" id="duplex"> พิมพ์สองหน้า (ใบเสร็จอยู่หลังบิล)</label></div>
@@ -78,15 +84,10 @@
         <div class="field"><label>ชื่อบัญชีพร้อมเพย์</label><input class="in" id="ppName"></div>
       </div>
       <div class="grid" style="margin-top:12px">
-        <div class="field"><label>ธนาคาร</label><input class="in" id="bankName" list="bankList" placeholder="เช่น ธ.ก.ส."></div>
+        <div class="field"><label>ธนาคาร</label><select class="in" id="bankCode"></select></div>
         <div class="field"><label>เลขที่บัญชี</label><input class="in" id="bankNo" inputmode="numeric" placeholder="xxx-x-xxxxx-x"></div>
         <div class="field"><label>ชื่อบัญชี</label><input class="in" id="bankAcc"></div>
       </div>
-      <datalist id="bankList">
-        <option value="ธ.ก.ส."><option value="ธนาคารออมสิน"><option value="ธนาคารกรุงไทย"><option value="ธนาคารกสิกรไทย">
-        <option value="ธนาคารไทยพาณิชย์"><option value="ธนาคารกรุงเทพ"><option value="ธนาคารกรุงศรีอยุธยา"><option value="ธนาคารทหารไทยธนชาต (ttb)">
-        <option value="ธนาคารอาคารสงเคราะห์">
-      </datalist>
     </details>
     <details id="setSig">
       <summary>✍️ ผู้ลงนามในใบเสร็จ</summary>
@@ -116,9 +117,11 @@ let ST = {}, BILLS = [], SIG = '';
   const { data, error } = await sb.from('settings').select('*').eq('id', 1).single();
   if (error) return toast('โหลดการตั้งค่าไม่ได้: ' + error.message, false);
   ST = data;
+  $('#bankCode').innerHTML = '<option value="">— เลือกธนาคาร —</option>'
+    + BANKS.map(b => `<option value="${b[0]}">${b[1]}</option>`).join('');
   $('#ppPhone').value = ST.promptpay_phone || ''; $('#ppTax').value = ST.promptpay_tax_id || '';
   $('#ppName').value = ST.promptpay_name || '';
-  $('#bankName').value = ST.bank_name || ''; $('#bankNo').value = ST.bank_account_no || ''; $('#bankAcc').value = ST.bank_account_name || '';
+  $('#bankCode').value = ST.bank_code || ''; $('#bankNo').value = ST.bank_account_no || ''; $('#bankAcc').value = ST.bank_account_name || '';
   $('#sigName').value = ST.signer_name || ''; $('#sigTitle').value = ST.signer_title || '';
   SIG = ST.signature || ''; showSig();
   const o = JSON.parse(localStorage.getItem('payOpts') || 'null')
@@ -126,6 +129,7 @@ let ST = {}, BILLS = [], SIG = '';
   $('#optPhone').checked = !!o.phone; $('#optTax').checked = !!o.tax; $('#optBank').checked = !!o.bank;
   $('#duplex').checked = localStorage.getItem('duplex') === '1';
   if (!ST.promptpay_phone && !ST.promptpay_tax_id && !ST.bank_account_no) $('#setPay').open = true;
+  if (ST.bank_account_no && !ST.bank_code) $('#setPay').open = true;
   if (!ST.signature) $('#setSig').open = true;
   fillMonthPicker($('#mSel'), $('#ySel'));
   await loadBills();
@@ -139,7 +143,7 @@ async function loadBills() {
   const start = ym + '-01';
   const end = m === 12 ? (y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01';
   let q = sb.from('bills')
-    .select('id,bill_no,period,units,price_per_unit,service_fee,amount,status,verify_code,households(house_no,owner_name,meter_no),readings(prev_reading,curr_reading)')
+    .select('id,bill_no,period,units,price_per_unit,service_fee,amount,status,verify_code,households(owner_name,meter_no),readings(prev_reading,curr_reading)')
     .gte('period', start).lt('period', end).order('bill_no');
   if ($('#onlyUnpaid').checked) q = q.eq('status', 'unpaid');
   const { data, error } = await q;
@@ -151,51 +155,52 @@ function payOpts() {
   const o = { phone: $('#optPhone').checked, tax: $('#optTax').checked, bank: $('#optBank').checked };
   localStorage.setItem('payOpts', JSON.stringify(o)); return o;
 }
-function ppList() {
-  const o = payOpts(), L = [], ph = $('#ppPhone').value, tx = $('#ppTax').value;
-  if (o.phone && validPhone(ph)) L.push({ id: ph, label: 'พร้อมเพย์ ' + fmtPhone(ph) });
-  if (o.tax && validTaxId(tx)) L.push({ id: tx, label: 'พร้อมเพย์ ' + maskTax(tx) });
+function payList() {
+  const o = payOpts(), L = [];
+  const ph = $('#ppPhone').value, tx = $('#ppTax').value, pn = $('#ppName').value.trim();
+  const bc = $('#bankCode').value, bn = $('#bankNo').value.trim(), ba = $('#bankAcc').value.trim();
+  if (o.phone && validPhone(ph)) L.push({ make: a => promptpayPayload(ph, a), t: 'พร้อมเพย์', id: fmtPhone(ph), name: pn });
+  if (o.tax && validTaxId(tx)) L.push({ make: a => promptpayPayload(tx, a), t: 'พร้อมเพย์', id: maskTax(tx), name: pn });
+  if (o.bank && bankPayload(bc, bn, 1)) L.push({ make: a => bankPayload(bc, bn, a), t: 'ธนาคาร' + bankLabel(bc), id: bn, name: ba });
   return L;
 }
-function bankInfo() {
-  const no = $('#bankNo').value.trim();
-  return payOpts().bank && no ? { bank: $('#bankName').value.trim(), no, name: $('#bankAcc').value.trim() } : null;
-}
 
-function header(title) {
-  return `<div class="hd"><div class="v">${esc(ST.village_name)}</div><div class="t">${title}</div></div>`;
-}
+const header = title => `<div class="hd"><div class="v">${esc(ST.village_name)}</div><div class="t">${title}</div></div>`;
 function who(b) {
   const h = b.households || {};
   return `<div class="meta"><span>เลขที่ <b>${esc(b.bill_no)}</b></span><span>ประจำเดือน ${thMonth(b.period)}</span></div>
-    <div class="who"><b>${esc(h.owner_name || '-')}</b><br>บ้านเลขที่ ${esc(h.house_no || '-')} · มิเตอร์ ${esc(h.meter_no || '-')}</div>`;
+    <div class="who"><b>${esc(h.owner_name || '-')}</b><br>หมายเลขมิเตอร์ ${esc(h.meter_no || '-')}</div>`;
 }
+const row = (label, val, unit, cls = '') => `<tr class="${cls}"><td>${label}</td><td class="n">${val}</td><td class="u">${unit}</td></tr>`;
 
-function billCard(b, pps, bank) {
+function billCard(b, pays) {
   const r = b.readings || {};
-  const qrs = pps.map(p => `<div>${qrImg(promptpayPayload(p.id, b.amount))}<div>${esc(p.label)}</div></div>`).join('');
-  const pay = (qrs ? `<div class="qrs ${pps.length > 1 ? 'two' : ''}">${qrs}</div><div>ชื่อบัญชี ${esc($('#ppName').value || '-')} · สแกนแล้วยอดเงินขึ้นเอง</div>` : '')
-    + (bank ? `<div class="bank">โอนเข้าบัญชี <b>${esc(bank.bank)}</b> เลขที่ <b>${esc(bank.no)}</b><br>ชื่อบัญชี ${esc(bank.name || '-')}</div>` : '')
-    || '<div style="color:#dc2626">ยังไม่ได้เลือกช่องทางชำระเงิน</div>';
+  const qrs = pays.map(p => `<div>${qrImg(p.make(b.amount))}<b>${esc(p.t)}</b><br>${esc(p.id)}<br>${esc(p.name || '')}</div>`).join('');
   return `<div class="slip">${header('ใบแจ้งค่าน้ำประปา')}${who(b)}
     <table>
-      <tr><td>เลขมิเตอร์ครั้งก่อน</td><td>${r.prev_reading ?? '-'}</td></tr>
-      <tr><td>เลขมิเตอร์ครั้งนี้</td><td>${r.curr_reading ?? '-'}</td></tr>
-      <tr><td>หน่วยที่ใช้</td><td>${b.units} หน่วย</td></tr>
-      <tr><td>ค่าน้ำ (${b.units} × ${money(b.price_per_unit)})</td><td>${money(b.units * b.price_per_unit)}</td></tr>
-      <tr><td>ค่าบริการ</td><td>${money(b.service_fee)}</td></tr>
-      <tr class="tot"><td>รวมเป็นเงิน</td><td>${money(b.amount)} บาท</td></tr>
+      ${row('เลขที่อ่านได้ครั้งก่อน', r.prev_reading ?? '-', 'ลบ.ม.')}
+      ${row('เลขที่อ่านได้ครั้งนี้', r.curr_reading ?? '-', 'ลบ.ม.')}
+      ${row('ปริมาณน้ำที่ใช้', b.units, 'หน่วย')}
+      ${row('อัตราค่าน้ำ', money(b.price_per_unit), 'บาท/หน่วย')}
+      ${row('ค่าน้ำ', money(b.units * b.price_per_unit), 'บาท')}
+      ${row('ค่าบริการ', money(b.service_fee), 'บาท')}
+      ${row('รวมเป็นเงิน', money(b.amount), 'บาท', 'tot')}
     </table>
-    <div class="pay">${pay}</div></div>`;
+    <div class="note">1 หน่วย = 1 ลูกบาศก์เมตร (ลบ.ม.)</div>
+    <div class="pay">${qrs
+      ? `<div class="qrs q${pays.length}">${qrs}</div><div style="margin-top:1mm">สแกนแล้วยอดเงินขึ้นเอง</div>`
+      : '<div style="color:#dc2626">ยังไม่ได้เลือกช่องทางชำระเงิน</div>'}</div></div>`;
 }
 
 function receiptCard(b) {
   const vurl = new URL('verify.html?c=' + b.verify_code, location.href).href;
   return `<div class="slip">${header('ใบเสร็จรับเงินค่าน้ำประปา')}${who(b)}
     <table>
-      <tr><td>ค่าน้ำประปา ${b.units} หน่วย</td><td>${money(b.units * b.price_per_unit)}</td></tr>
-      <tr><td>ค่าบริการ</td><td>${money(b.service_fee)}</td></tr>
-      <tr class="tot"><td>รวมเป็นเงิน</td><td>${money(b.amount)} บาท</td></tr>
+      ${row('ปริมาณน้ำที่ใช้', b.units, 'หน่วย')}
+      ${row('อัตราค่าน้ำ', money(b.price_per_unit), 'บาท/หน่วย')}
+      ${row('ค่าน้ำ', money(b.units * b.price_per_unit), 'บาท')}
+      ${row('ค่าบริการ', money(b.service_fee), 'บาท')}
+      ${row('รวมเป็นเงิน', money(b.amount), 'บาท', 'tot')}
     </table>
     <div class="word">(${bahtText(b.amount)})</div>
     <div style="margin-top:1.5mm">ชำระโดย ☐ เงินสด ☐ โอน &nbsp; วันที่ ......../......../........</div>
@@ -207,11 +212,11 @@ function receiptCard(b) {
 }
 
 function render() {
-  const pps = ppList(), bank = bankInfo(), duplex = $('#duplex').checked, empty = '<div class="slip"></div>';
+  const pays = payList(), duplex = $('#duplex').checked, empty = '<div class="slip"></div>';
   let html = '';
   for (let i = 0; i < BILLS.length; i += 4) {
     const g = BILLS.slice(i, i + 4);
-    const bc = g.map(b => billCard(b, pps, bank)), rc = g.map(receiptCard);
+    const bc = g.map(b => billCard(b, pays)), rc = g.map(receiptCard);
     while (bc.length < 4) { bc.push(empty); rc.push(empty); }
     html += `<div class="sheet">${bc.join('')}</div>`;
     html += `<div class="sheet">${(duplex ? [rc[1], rc[0], rc[3], rc[2]] : rc).join('')}</div>`;
@@ -225,7 +230,7 @@ function render() {
 $('#mSel').onchange = loadBills; $('#ySel').onchange = loadBills; $('#onlyUnpaid').onchange = loadBills;
 ['#optPhone', '#optTax', '#optBank'].forEach(s => $(s).onchange = render);
 $('#duplex').onchange = () => { localStorage.setItem('duplex', $('#duplex').checked ? '1' : '0'); render(); };
-['#ppPhone', '#ppTax', '#ppName', '#bankName', '#bankNo', '#bankAcc', '#sigName', '#sigTitle'].forEach(s => $(s).onchange = render);
+['#ppPhone', '#ppTax', '#ppName', '#bankCode', '#bankNo', '#bankAcc', '#sigName', '#sigTitle'].forEach(s => $(s).onchange = render);
 
 $('#sigFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -245,12 +250,15 @@ $('#sigClear').onclick = () => { SIG = ''; showSig(); render(); };
 
 $('#btnSave').onclick = async () => {
   const ph = digitsOnly($('#ppPhone').value), tx = digitsOnly($('#ppTax').value);
+  const bc = $('#bankCode').value, bn = $('#bankNo').value.trim();
   if (ph && !validPhone(ph)) return toast('เบอร์มือถือต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0', false);
   if (tx && !validTaxId(tx)) return toast('เลขบัตรประชาชนไม่ถูกต้อง (ตรวจหลักสุดท้ายไม่ผ่าน)', false);
+  if (bn && !bc) return toast('กรุณาเลือกธนาคาร', false);
+  if (bn && !bankPayload(bc, bn, 1)) return toast('เลขบัญชีต้องเป็นตัวเลข 10–15 หลัก', false);
   const { error } = await sb.from('settings').update({
     promptpay_phone: ph || null, promptpay_tax_id: tx || null, promptpay_name: $('#ppName').value.trim() || null,
-    bank_name: $('#bankName').value.trim() || null, bank_account_no: $('#bankNo').value.trim() || null,
-    bank_account_name: $('#bankAcc').value.trim() || null,
+    bank_code: bc || null, bank_name: bc ? bankLabel(bc) : null,
+    bank_account_no: bn || null, bank_account_name: $('#bankAcc').value.trim() || null,
     signer_name: $('#sigName').value.trim(), signer_title: $('#sigTitle').value.trim(), signature: SIG || null,
   }).eq('id', 1);
   if (error) return toast('บันทึกไม่สำเร็จ: ' + error.message, false);
@@ -259,7 +267,9 @@ $('#btnSave').onclick = async () => {
 
 $('#btnPrint').onclick = () => {
   if (!BILLS.length) return toast('ไม่มีบิลให้พิมพ์', false);
-  if (!ppList().length && !bankInfo() && !confirm('ยังไม่ได้เลือกช่องทางชำระเงิน พิมพ์ต่อไหม?')) return;
+  if ($('#optBank').checked && !bankPayload($('#bankCode').value, $('#bankNo').value, 1))
+    return toast('ข้อมูลบัญชีธนาคารยังไม่ครบ (เลือกธนาคาร และใส่เลขบัญชี)', false);
+  if (!payList().length && !confirm('ยังไม่ได้เลือกช่องทางชำระเงิน พิมพ์ต่อไหม?')) return;
   window.print();
 };
 </script>

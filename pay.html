@@ -80,7 +80,7 @@ function renderUnpaid() {
   $('#list').innerHTML = L.length ? L.map(b => { const h = b.households || {};
     return `<div class="card item"><div class="top"><div>
         <div class="nm">${esc(h.owner_name || '-')}</div>
-        <div class="muted">บ้านเลขที่ ${esc(h.house_no || '-')} · มิเตอร์ ${esc(h.meter_no || '-')}</div>
+        <div class="muted">บ้านเลขที่ ${esc(h.house_no || '-')} · หมายเลขมิเตอร์ ${esc(h.meter_no || '-')}</div>
         <div class="muted small">${esc(b.bill_no)} · ${thMonth(b.period)} · ใช้น้ำ ${b.units} หน่วย</div></div>
         <div class="amt">${money(b.amount)} <small style="font-size:14px">บาท</small></div></div>
       <div class="btn-row"><button class="btn ok" data-pay="${b.id}">💵 รับเงินสด</button><button class="btn" data-qr="${b.id}">📲 โอน / QR</button></div></div>`;
@@ -93,21 +93,28 @@ $('#list').onclick = e => {
   if (q) { qrBill = UNPAID.find(b => b.id === +q.dataset.qr); if (qrBill) { drawQR(); $('#qrBox').style.display = 'flex'; } }
 };
 
-function drawQR() {
-  const b = qrBill, h = b.households || {};
-  const ids = { phone: validPhone(ST.promptpay_phone) ? ST.promptpay_phone : '', tax: validTaxId(ST.promptpay_tax_id) ? ST.promptpay_tax_id : '' };
-  if (!ids[qrUse]) qrUse = ids.phone ? 'phone' : 'tax';
-  const pl = ids[qrUse] ? promptpayPayload(ids[qrUse], b.amount) : null;
-  $('#qrTitle').innerHTML = `<div class="nm">${esc(h.owner_name || '-')}</div>
-    <div class="muted">บ้านเลขที่ ${esc(h.house_no || '-')} · ${esc(b.bill_no)}</div>
-    <div class="amt" style="font-size:28px">${money(b.amount)} บาท</div>`;
-  $('#qrImg').innerHTML = pl ? qrImg(pl) + `<div class="muted small">พร้อมเพย์ ${qrUse === 'phone' ? fmtPhone(ids.phone) : maskTax(ids.tax)} · ${esc(ST.promptpay_name || '-')}</div>` : '';
-  $('#qrBank').innerHTML = ST.bank_account_no ? `<div class="bankbox">โอนเข้าบัญชี <b>${esc(ST.bank_name || '')}</b><br><b class="acc">${esc(ST.bank_account_no)}</b><br>${esc(ST.bank_account_name || '')}</div>` : '';
-  if (!pl && !ST.bank_account_no) $('#qrImg').innerHTML = '<p class="bad">ยังไม่ได้ตั้งช่องทางรับโอน (แอดมินตั้งได้ที่หน้าออกบิล)</p>';
-  $('#qrSw').style.display = ids.phone && ids.tax ? '' : 'none';
-  $('#qrSw').textContent = '🔁 สลับเป็น' + (qrUse === 'phone' ? 'เลขบัตรประชาชน' : 'เบอร์มือถือ');
+function qrOptions() {
+  const L = [];
+  if (validPhone(ST.promptpay_phone)) L.push({ k: 'phone', t: 'เบอร์มือถือ', label: 'พร้อมเพย์ ' + fmtPhone(ST.promptpay_phone), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_phone, a) });
+  if (validTaxId(ST.promptpay_tax_id)) L.push({ k: 'tax', t: 'เลขบัตรประชาชน', label: 'พร้อมเพย์ ' + maskTax(ST.promptpay_tax_id), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_tax_id, a) });
+  if (bankPayload(ST.bank_code, ST.bank_account_no, 1)) L.push({ k: 'bank', t: 'บัญชีธนาคาร', label: 'ธนาคาร' + bankLabel(ST.bank_code) + ' ' + ST.bank_account_no, name: ST.bank_account_name, make: a => bankPayload(ST.bank_code, ST.bank_account_no, a) });
+  return L;
 }
-$('#qrSw').onclick = () => { qrUse = qrUse === 'phone' ? 'tax' : 'phone'; drawQR(); };
+function drawQR() {
+  const b = qrBill, h = b.households || {}, L = qrOptions();
+  let i = L.findIndex(o => o.k === qrUse); if (i < 0 && L.length) { i = 0; qrUse = L[0].k; }
+  const o = L[i];
+  $('#qrTitle').innerHTML = `<div class="nm">${esc(h.owner_name || '-')}</div>
+    <div class="muted">หมายเลขมิเตอร์ ${esc(h.meter_no || '-')} · ${esc(b.bill_no)}</div>
+    <div class="amt" style="font-size:28px">${money(b.amount)} บาท</div>`;
+  $('#qrImg').innerHTML = o
+    ? qrImg(o.make(b.amount)) + `<div class="muted small">${esc(o.label)}<br>${esc(o.name || '')}</div>`
+    : '<p class="bad">ยังไม่ได้ตั้งช่องทางรับโอน (แอดมินตั้งได้ที่หน้าออกบิล)</p>';
+  $('#qrBank').innerHTML = '';
+  $('#qrSw').style.display = L.length > 1 ? '' : 'none';
+  if (L.length > 1) $('#qrSw').textContent = '🔁 สลับเป็น' + L[(i + 1) % L.length].t;
+}
+$('#qrSw').onclick = () => { const L = qrOptions(), i = L.findIndex(o => o.k === qrUse); qrUse = L[(i + 1) % L.length].k; drawQR(); };
 $('#qrClose').onclick = () => ($('#qrBox').style.display = 'none');
 $('#qrOk').onclick = () => qrBill && pay(qrBill.id, 'transfer');
 

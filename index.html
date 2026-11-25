@@ -128,7 +128,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
       <div id="progress" class="mut"></div>
       <div id="cacheNote" class="mut small"></div>
     </div>
-<input type="search" id="search" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์" autocomplete="off" autocorrect="off" spellcheck="false">    <div class="tabs">
+<input type="search" id="search" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / หมายเลขมิเตอร์" autocomplete="off" autocorrect="off" spellcheck="false">    <div class="tabs">
       <button data-f="todo" class="on">ยังไม่จด</button>
       <button data-f="all">ทั้งหมด</button>
       <button data-f="done">จดแล้ว</button>
@@ -165,7 +165,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
   <!-- ===== หน้ายืนยันตัวเลขใหญ่ ===== -->
   <section id="scrConfirm" class="screen hidden">
     <div class="card center">
-      <div class="mut">ตรวจสอบเลขมิเตอร์ให้ตรงกับรูป</div>
+      <div class="mut">ตรวจสอบเลขที่อ่านได้ให้ตรงกับรูป</div>
       <div id="cName" class="hname"></div>
       <div id="cBig" class="big"></div>
       <div class="grid2">
@@ -391,7 +391,7 @@ function renderList() {
 rows.push(`<div class="item ${st}" data-id="${esc(h.id)}">
   <div class="ord">${esc(h.route_order ?? '–')}</div>
   <div class="info"><div class="nm">${esc(h.owner_name)}</div>
-  <div class="mut small">บ้าน ${esc(h.house_no || 'ยังไม่ระบุ')} · มิเตอร์ ${esc(h.meter_no || '-')}</div></div>${tag}</div>`);
+  <div class="mut small">บ้าน ${esc(h.house_no || 'ยังไม่ระบุ')} · หมายเลขมิเตอร์ ${esc(h.meter_no || '-')}</div></div>${tag}</div>`);
   });
   const total = S.households.length;
   $('#progress').textContent = `จดแล้ว ${nDone} / ${total} หลัง`;
@@ -409,7 +409,7 @@ function openReading(id) {
   if (S.photoUrl) URL.revokeObjectURL(S.photoUrl); S.photoUrl = null;
   const m = S.map[h.id] || {};
   $('#rName').textContent = h.owner_name;
-  $('#rInfo').textContent = `บ้านเลขที่ ${h.house_no || 'ยังไม่ระบุ'} · มิเตอร์ ${h.meter_no || '-'} · ${h.meter_digits || 4} หลัก`;
+  $('#rInfo').textContent = `บ้านเลขที่ ${h.house_no || 'ยังไม่ระบุ'} · หมายเลขมิเตอร์ ${h.meter_no || '-'} · ${h.meter_digits || 4} หลัก`;
   $('#rPrev').textContent = fmt(m.prev, h.meter_digits) + (m.prevPeriod ? '' : ' (เลขเริ่มต้น)');
   $('#reading').value = ''; $('#reading').maxLength = h.meter_digits || 4;
   $('#resetType').value = ''; $('#readErr').textContent = '';

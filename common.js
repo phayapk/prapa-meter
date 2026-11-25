@@ -102,3 +102,23 @@ function fillMonthPicker(mSel, ySel, ym) {
 }
 const pickerValue = (mSel, ySel) => (Number(ySel.value) - 543) + '-' + mSel.value;
 const homeHref = role => role === 'admin' ? 'admin.html' : 'index.html';
+// ===== ธนาคาร (รหัส 3 หลัก) =====
+const BANKS = [
+  ['034', 'ธ.ก.ส.'], ['030', 'ออมสิน'], ['006', 'กรุงไทย'], ['004', 'กสิกรไทย'],
+  ['014', 'ไทยพาณิชย์'], ['002', 'กรุงเทพ'], ['025', 'กรุงศรีอยุธยา'], ['011', 'ทหารไทยธนชาต (ttb)'],
+  ['033', 'อาคารสงเคราะห์'], ['024', 'ยูโอบี'], ['022', 'ซีไอเอ็มบี ไทย'], ['069', 'เกียรตินาคินภัทร'],
+  ['073', 'แลนด์ แอนด์ เฮ้าส์'], ['067', 'ทิสโก้'], ['066', 'อิสลามแห่งประเทศไทย'],
+];
+const bankLabel = c => (BANKS.find(b => b[0] === c) || ['', ''])[1];
+
+// QR โอนเข้าเลขบัญชีธนาคาร (Thai QR: รหัสธนาคาร + เลขบัญชี)
+function bankPayload(code, acc, amount) {
+  const c = digitsOnly(code), a = digitsOnly(acc);
+  if (c.length !== 3 || a.length < 10 || a.length > 15) return null;
+  const amt = Number(amount) > 0;
+  const p = tlv('00', '01') + tlv('01', amt ? '12' : '11')
+    + tlv('29', tlv('00', 'A000000677010111') + tlv('04', c + a))
+    + tlv('53', '764') + (amt ? tlv('54', Number(amount).toFixed(2)) : '')
+    + tlv('58', 'TH') + '6304';
+  return p + crc16(p);
+}
