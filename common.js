@@ -5,7 +5,7 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const money = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = n => { const v = Number(n || 0); return v.toLocaleString('th-TH', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 const TH_M = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 const thMonth = d => { const [y, m] = String(d).split('-').map(Number); return TH_M[m - 1] + ' ' + (y + 543); };
 const thDateTime = t => new Date(t).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
@@ -91,3 +91,14 @@ function bahtText(n) {
   const [b, s] = Number(n || 0).toFixed(2).split('.');
   return (say(b) || 'ศูนย์') + 'บาท' + (+s ? say(s) + 'สตางค์' : 'ถ้วน');
 }
+// ===== ตัวเลือกเดือน/ปี พ.ศ. =====
+function fillMonthPicker(mSel, ySel, ym) {
+  const [y, m] = (ym || todayTH().slice(0, 7)).split('-').map(Number);
+  mSel.innerHTML = TH_M.map((t, i) => `<option value="${String(i + 1).padStart(2, '0')}">${t}</option>`).join('');
+  const be = y + 543, now = Number(todayTH().slice(0, 4)) + 543, ys = [];
+  for (let k = Math.min(be, now) - 2; k <= Math.max(be, now) + 1; k++) ys.push(k);
+  ySel.innerHTML = ys.map(k => `<option value="${k}">พ.ศ. ${k}</option>`).join('');
+  mSel.value = String(m).padStart(2, '0'); ySel.value = String(be);
+}
+const pickerValue = (mSel, ySel) => (Number(ySel.value) - 543) + '-' + mSel.value;
+const homeHref = role => role === 'admin' ? 'admin.html' : 'index.html';

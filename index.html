@@ -56,6 +56,23 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 .qnum{font-size:24px;font-weight:700;letter-spacing:2px}
 .del{background:#fde8e8;color:var(--bad);border:0;border-radius:8px;padding:8px 12px;font-family:inherit}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:12px 18px;border-radius:12px;z-index:50;max-width:90%;text-align:center}
+/* ===== UI v2 ===== */
+#topbar{flex-wrap:wrap;gap:6px}
+.hnav{display:flex;gap:6px;margin-left:auto}
+.hbtn{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-width:76px;height:40px;padding:0 10px;border-radius:10px;background:rgba(255,255,255,.18);color:#fff;border:0;font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap;font-family:inherit}
+.hbtn.out{background:transparent;border:1.5px solid rgba(255,255,255,.55)}
+@media(max-width:480px){.hnav{width:100%}.hnav .hbtn{flex:1;min-width:0}}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;font-size:17px;font-weight:700;margin-top:10px;font-family:inherit}
+.btn.huge{min-height:64px;font-size:20px}
+.btn.sec,.btn.ghost{background:#fff!important;color:#334155!important;border:1.5px solid #cbd5e1!important}
+.subnav{margin-bottom:10px}
+.subnav .btn{width:auto;min-height:44px;margin:0;padding:8px 16px;font-size:15px}
+.photoBtn{display:flex;align-items:center;justify-content:center;min-height:64px;border-radius:14px;font-size:19px;font-weight:700}
+#search{min-height:48px;font-size:17px;border-radius:12px}
+#camBox button{flex:1;min-height:54px;border:0;border-radius:12px;font-size:16px!important;font-weight:700;padding:0 10px!important}
+#camCancel{background:#fff;color:#334155}
+#camTorch{background:#facc15;color:#111}
+#camShot{background:#16a34a;color:#fff;flex:1.6!important}
 </style>
 </head>
 <body>
@@ -76,10 +93,12 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 <header id="topbar" class="hidden">
   <h1>💧 จดมิเตอร์</h1>
   <span id="net" class="net">ออนไลน์</span>
-  <button class="hbtn" id="btnQueue">รอส่ง<span id="qCount" class="badge hidden">0</span></button>
-<a href="admin.html" style="background:rgba(255,255,255,.2);color:#fff;padding:8px 14px;border-radius:10px;font-weight:700;text-decoration:none;font-size:15px;white-space:nowrap;">🏠 หน้าหลัก</a>
-  <a href="pay.html" style="padding:8px 12px;background:#0f766e;color:#fff;border-radius:8px;text-decoration:none">💰 รับเงิน</a>
-  <button class="hbtn" id="btnLogout">ออก</button>
+  <nav class="hnav">
+    <button class="hbtn" id="btnQueue">📤 รอส่ง<span id="qCount" class="badge hidden">0</span></button>
+    <a class="hbtn" href="pay.html">💰 รับเงิน</a>
+    <a class="hbtn hidden" id="lnkAdmin" href="admin.html">⚙️ แอดมิน</a>
+    <button class="hbtn out" id="btnLogout">ออก</button>
+  </nav>
 </header>
 
 <main>
@@ -109,8 +128,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
       <div id="progress" class="mut"></div>
       <div id="cacheNote" class="mut small"></div>
     </div>
-    <input type="search" id="search" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์">
-    <div class="tabs">
+<input type="search" id="search" placeholder="🔍 ค้นหา ชื่อ / บ้านเลขที่ / เลขมิเตอร์" autocomplete="off" autocorrect="off" spellcheck="false">    <div class="tabs">
       <button data-f="todo" class="on">ยังไม่จด</button>
       <button data-f="all">ทั้งหมด</button>
       <button data-f="done">จดแล้ว</button>
@@ -120,7 +138,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 
   <!-- ===== หน้าถ่ายรูป + กรอกเลข ===== -->
   <section id="scrRead" class="screen hidden">
-    <button class="back" data-go="scrList">← กลับรายชื่อ</button>
+    <div class="subnav"><button class="btn ghost" data-go="scrList">← รายชื่อบ้าน</button></div>
     <div class="card">
       <div id="rName" class="hname"></div>
       <div id="rInfo" class="mut"></div>
@@ -164,7 +182,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 
   <!-- ===== หน้ารอส่ง (ออฟไลน์) ===== -->
   <section id="scrQueue" class="screen hidden">
-    <button class="back" data-go="scrList">← กลับรายชื่อ</button>
+    <div class="subnav"><button class="btn ghost" data-go="scrList">← รายชื่อบ้าน</button></div>
     <div class="card">
       <h3 style="margin:0">รายการรอส่งขึ้นระบบ</h3>
       <p class="mut small">ข้อมูลเก็บอยู่ในเครื่องนี้ ระบบจะส่งให้อัตโนมัติเมื่อมีสัญญาณ ห้ามล้างข้อมูลเบราว์เซอร์จนกว่าจะส่งครบ</p>
@@ -236,10 +254,35 @@ const DB = (() => {
 })();
 
 // ---------- ตัวช่วย ----------
+let roleChecked = false;
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('hidden', s.id !== id));
   $('#topbar').classList.toggle('hidden', id === 'scrLogin');
   window.scrollTo(0, 0);
+  if (id === 'scrLogin') { roleChecked = false; return; }
+  if (id === 'scrRead' || id === 'scrConfirm') {
+    $('#search').value = '';                                   // ไม่จำคำค้นเดิม
+    if (!history.state || !history.state.sub) history.pushState({ sub: true }, '');
+  }
+  if (id === 'scrList' && S.households.length) renderList();
+  if (!roleChecked) {
+    roleChecked = true;
+    sb.rpc('my_role').then(({ data }) => $('#lnkAdmin').classList.toggle('hidden', data !== 'admin'));
+  }
+}
+// ปุ่มย้อนกลับของมือถือ
+window.addEventListener('popstate', () => {
+  if (typeof closeCamera === 'function') closeCamera();
+  if (!$('#scrConfirm').classList.contains('hidden')) show('scrRead');
+  else if (!$('#scrRead').classList.contains('hidden') || !$('#scrQueue').classList.contains('hidden')) show('scrList');
+});
+function nextHouse(curId) {
+  const L = S.households, i = L.findIndex(x => String(x.id) === String(curId));
+  for (let k = 1; k < L.length; k++) {
+    const h = L[(i + k) % L.length];
+    if (statusOf(h) === 'todo') return h;
+  }
+  return null;
 }
 let toastTimer;
 function toast(msg, ms = 2800) {
@@ -423,6 +466,7 @@ async function aiReadMeter(blob) {
     // ถ้าถ่ายรูปใหม่หรือเปลี่ยนไปบ้านอื่นแล้ว ไม่ต้องกรอก
     if (seq !== aiSeq || !S.cur || S.cur.id !== houseId) return;
     if (error) throw error;
+    if (data && data.reading != null) S.ai = { house: houseId, value: data.reading, conf: data.confidence || null };
 
     if (data.reading == null) {
       aiHint('⚠️ AI อ่านไม่ได้ ' + (data.note || '') + ' กรุณากรอกเอง', '#b45309');
@@ -468,6 +512,7 @@ aiHint('🤖 AI อ่านได้ ' + data.reading +
 }
 // ---------- ประมวลผลรูป: เก็บรูปเต็มเป็นหลักฐาน ส่งรูปที่ตัดแล้วให้ AI ----------
 async function handlePhoto(f, aiBlob) {
+  S.ai = null;
   const label = document.getElementById('photoLabel');
   const preview = document.getElementById('preview');
   label.textContent = 'กำลังย่อรูป...';
@@ -646,17 +691,26 @@ $('#btnSave').addEventListener('click', async () => {
   const b = $('#btnSave'); b.disabled = true;
   try {
     const h = S.cur, p = S.pending;
+    const ai = (S.ai && S.ai.house === h.id) ? S.ai : null;
     await DB.put({
       id: crypto.randomUUID(), householdId: h.id, period: period(),
       reading: p.curr, resetType: p.type || null,
       photo: S.photo ? await S.photo.arrayBuffer() : null,
       takenAt: new Date().toISOString(),
+      aiValue: ai ? ai.value : null, aiConfidence: ai ? ai.conf : null,
       label: `${h.owner_name} (บ้าน ${h.house_no || '-'})`, error: null
     });
+    S.ai = null;
     await refreshQueue();
-    toast('✓ บันทึกในเครื่องแล้ว' + (navigator.onLine ? ' กำลังส่ง...' : ' (จะส่งเมื่อมีสัญญาณ)'));
-    show('scrList'); renderList();
     syncNow();
+    const next = nextHouse(h.id);
+    if (next) {
+      openReading(next.id); show('scrRead');
+      toast(`✓ บันทึก ${h.owner_name} แล้ว → ถัดไป: ${next.owner_name} (บ้าน ${next.house_no || '-'})`);
+    } else {
+      show('scrList'); renderList();
+      toast('✓ บันทึกแล้ว จดครบทุกบ้านในรอบนี้ 🎉');
+    }
   } catch (e) { alert('บันทึกไม่สำเร็จ: ' + e.message); }
   finally { b.disabled = false; }
 });
@@ -680,10 +734,13 @@ async function syncNow(manual) {
             .upload(photo_path, new Blob([it.photo], { type: 'image/jpeg' }), { contentType: 'image/jpeg' });
           if (error && !(/exist|duplicate/i.test(error.message) || String(error.statusCode) === '409')) throw error;
         }
-        const { error } = await sb.from('readings').insert({
-          household_id: it.householdId, period: it.period, curr_reading: it.reading,
-          reset_type: it.resetType, photo_path, taken_at: it.takenAt
-        });
+const { error } = await sb.from('readings').insert({
+  household_id: it.householdId, period: it.period, curr_reading: it.reading,
+  reset_type: it.resetType, photo_path, taken_at: it.takenAt,
+  ai_value: it.aiValue ?? null, ai_confidence: it.aiConfidence ?? null,
+  edited_by_hand: it.aiValue == null ? true : it.aiValue !== it.reading,
+});
+
         if (error) {
           if (error.code !== '23505') throw error;
           // งวดนี้มีเลขในระบบแล้ว ให้ดูว่าตรงกับที่จดไหม

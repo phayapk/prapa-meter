@@ -5,79 +5,105 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ออกบิลและใบเสร็จ</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="common.js"></script>
 <style>
-  body{font-family:Sarabun,sans-serif;margin:0;background:#e5e7eb;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .panel{max-width:900px;margin:16px auto;background:#fff;border-radius:12px;padding:16px 20px}
-  .panel h2{margin:0 0 8px}.panel h3{margin:14px 0 4px;font-size:16px}
-  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
-  .panel input[type=text],.panel input[type=month]{padding:8px;font-size:15px;border:1px solid #ccc;border-radius:8px;min-width:200px}
-  button{padding:9px 16px;font-size:15px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer}
-  button.gray{background:#6b7280}
-  #sigPrev{height:50px;border:1px dashed #ccc;display:none}
-  .hint{font-size:13px;color:#6b7280}
-  .sheet{width:210mm;height:297mm;margin:10px auto;background:#fff;display:grid;grid-template-columns:105mm 105mm;grid-template-rows:148.5mm 148.5mm;box-shadow:0 2px 8px rgba(0,0,0,.2)}
-  .card{box-sizing:border-box;padding:6mm 7mm;border:.2mm dashed #9ca3af;overflow:hidden;display:flex;flex-direction:column;font-size:10pt;line-height:1.35}
-  .hd{text-align:center;border-bottom:.3mm solid #111;padding-bottom:1.5mm;margin-bottom:2mm}
-  .hd .v{font-size:8.5pt}.hd .t{font-size:13pt;font-weight:700}
-  .meta{display:flex;justify-content:space-between;font-size:9.5pt;margin-bottom:1mm}
-  table.it{width:100%;border-collapse:collapse;margin:1.5mm 0}
-  table.it td{padding:.5mm 0}table.it td:last-child{text-align:right}
-  tr.tot td{font-size:12.5pt;font-weight:700;border-top:.3mm solid #111;padding-top:1mm}
-  .qrs{display:flex;justify-content:center;gap:4mm;margin-top:auto;text-align:center;font-size:7.5pt}
-  img.qr{width:30mm;height:30mm;image-rendering:pixelated}
-  .qrs.two img.qr{width:24mm;height:24mm}
-  img.vqr{width:15mm;height:15mm;image-rendering:pixelated}
-  .word{text-align:center;font-size:9pt;background:#f3f4f6;padding:1mm}
-  .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:3mm;margin-top:auto;font-size:8pt}
-  .sig{text-align:center;font-size:9pt}.sig img{height:13mm;max-width:45mm;display:block;margin:0 auto}
-  .small{font-size:7.5pt;text-align:center;color:#444}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #sigPrev{height:56px;border:1px dashed #cbd5e1;border-radius:8px;display:none;background:#fff}
+  .sheet{width:210mm;height:297mm;margin:12px auto;background:#fff;display:grid;grid-template-columns:105mm 105mm;grid-template-rows:148.5mm 148.5mm;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  .slip{box-sizing:border-box;padding:6mm 7mm;border:.2mm dashed #9ca3af;overflow:hidden;display:flex;flex-direction:column;font-family:Sarabun,sans-serif;font-size:10pt;line-height:1.55;color:#111}
+  .slip .hd{text-align:center;border-bottom:.3mm solid #111;padding-bottom:1.5mm;margin-bottom:2mm}
+  .slip .hd .v{font-size:8.5pt;line-height:1.75}
+  .slip .hd .t{font-size:13pt;font-weight:700;line-height:1.7;margin-top:.5mm}
+  .slip .meta{display:flex;justify-content:space-between;font-size:9.5pt}
+  .slip .who{margin:1mm 0}
+  .slip .who b{font-size:11pt}
+  .slip table{width:100%;border-collapse:collapse;margin:1mm 0}
+  .slip td{padding:.3mm 0}.slip td:last-child{text-align:right}
+  .slip tr.tot td{font-size:12.5pt;font-weight:700;border-top:.3mm solid #111;padding-top:1mm}
+  .slip .pay{margin-top:auto;text-align:center;font-size:7.5pt}
+  .slip .qrs{display:flex;justify-content:center;gap:4mm}
+  .slip img.qr{width:28mm;height:28mm;image-rendering:pixelated}
+  .slip .qrs.two img.qr{width:22mm;height:22mm}
+  .slip .bank{border:.2mm solid #999;border-radius:1.5mm;padding:1mm;margin-top:1mm;font-size:8.5pt}
+  .slip img.vqr{width:15mm;height:15mm;image-rendering:pixelated}
+  .slip .word{text-align:center;font-size:9pt;background:#f3f4f6;padding:1mm}
+  .slip .foot{display:flex;justify-content:space-between;align-items:flex-end;gap:3mm;margin-top:auto;font-size:8pt}
+  .slip .sig{text-align:center;font-size:9pt}.slip .sig img{height:13mm;max-width:45mm;display:block;margin:0 auto}
   @page{size:A4;margin:0}
-  @media print{body{background:#fff}.no-print{display:none!important}.sheet{margin:0;box-shadow:none;break-after:page;page-break-after:always}}
+  @media print{body{background:#fff}.sheet{margin:0;box-shadow:none;break-after:page;page-break-after:always}}
 </style>
 </head>
 <body>
-<div class="panel no-print">
-  <h2>🧾 ออกบิลและใบเสร็จ</h2>
-  <div class="row">
-    เดือน <input type="month" id="month">
-    <label><input type="checkbox" id="onlyUnpaid" checked> เฉพาะบิลที่ยังไม่จ่าย</label>
-    <button id="btnLoad">โหลด</button>
-    <a href="admin.html">← กลับหน้าแอดมิน</a>
-  </div>
+<header class="topbar no-print">
+  <a class="btn light" href="admin.html" style="justify-self:start">← แอดมิน</a>
+  <h1>🧾 ออกบิลและใบเสร็จ</h1>
+  <span></span>
+</header>
 
-  <h3>พร้อมเพย์</h3>
-  <div class="row">
-    <input type="text" id="ppPhone" placeholder="เบอร์มือถือ 10 หลัก" inputmode="numeric">
-    <input type="text" id="ppTax" placeholder="เลขบัตรประชาชน 13 หลัก" inputmode="numeric">
-    <input type="text" id="ppName" placeholder="ชื่อบัญชี">
-  </div>
-  <div class="row">QR บนบิล:
-    <label><input type="radio" name="ppUse" value="phone"> เบอร์มือถือ</label>
-    <label><input type="radio" name="ppUse" value="tax"> เลขบัตรประชาชน</label>
-    <label><input type="radio" name="ppUse" value="both"> ทั้งสองแบบ</label>
-  </div>
+<div class="wrap no-print">
+  <section class="card">
+    <h2>1. เลือกเดือนที่จะพิมพ์</h2>
+    <div class="grid">
+      <div class="field"><label>เดือน / ปี</label>
+        <div class="row"><select id="mSel" class="in"></select><select id="ySel" class="in"></select></div></div>
+      <div class="field"><label>แสดง</label>
+        <div class="chips"><label class="chip"><input type="checkbox" id="onlyUnpaid" checked> เฉพาะบิลที่ยังไม่จ่าย</label></div></div>
+    </div>
+    <div class="kpis"><div><small>จำนวนบิล</small><b id="kN">0</b></div><div><small>กระดาษ A4</small><b id="kP">0</b></div><div><small>ยอดรวม (บาท)</small><b id="kT">0</b></div></div>
 
-  <h3>ผู้ลงนามในใบเสร็จ</h3>
-  <div class="row">
-    <input type="text" id="sigName" placeholder="ชื่อ-นามสกุล">
-    <input type="text" id="sigTitle" placeholder="ตำแหน่ง">
-  </div>
-  <div class="row">ลายเซ็น: <img id="sigPrev" alt="ลายเซ็น">
-    <input type="file" id="sigFile" accept="image/*">
-    <button class="gray" id="sigClear">ลบลายเซ็น</button>
-  </div>
-  <div class="hint">เซ็นด้วยปากกาสีเข้มบนกระดาษขาว ถ่ายรูปให้เห็นแค่ลายเซ็น ระบบจะลบพื้นหลังขาวให้เอง</div>
-  <div class="row"><button id="btnSave">💾 บันทึกการตั้งค่า</button></div>
-  <hr>
-  <div class="row">
-    <label><input type="checkbox" id="duplex"> พิมพ์สองหน้า (บิลด้านหน้า ใบเสร็จด้านหลัง)</label>
-    <button id="btnPrint">🖨️ พิมพ์</button>
-    <span id="sum"></span>
-  </div>
-  <div class="hint">ตอนพิมพ์ ตั้งค่า: กระดาษ A4, ขอบ (Margins) = ไม่มี, สเกล 100%, เปิด "กราฟิกพื้นหลัง"</div>
+    <h2>2. ช่องทางชำระเงินบนบิล</h2>
+    <div class="chips">
+      <label class="chip"><input type="checkbox" id="optPhone"> QR พร้อมเพย์ (เบอร์มือถือ)</label>
+      <label class="chip"><input type="checkbox" id="optTax"> QR พร้อมเพย์ (เลขบัตรประชาชน)</label>
+      <label class="chip"><input type="checkbox" id="optBank"> เลขบัญชีธนาคาร</label>
+    </div>
+    <p class="muted small">QR ใส่ได้สูงสุด 2 อันต่อบิล ส่วนเลขบัญชีธนาคารแสดงเป็นตัวอักษร</p>
+
+    <h2>3. พิมพ์</h2>
+    <div class="chips"><label class="chip"><input type="checkbox" id="duplex"> พิมพ์สองหน้า (ใบเสร็จอยู่หลังบิล)</label></div>
+    <div class="btn-row"><button class="btn lg" id="btnPrint">🖨️ พิมพ์บิลและใบเสร็จ</button></div>
+    <p class="muted small">ตั้งค่าเครื่องพิมพ์: กระดาษ A4 · ขอบ (Margins) = ไม่มี · สเกล 100% · เปิด "กราฟิกพื้นหลัง"</p>
+  </section>
+
+  <section class="card">
+    <h2>⚙️ ตั้งค่า (ทำครั้งเดียว)</h2>
+    <details id="setPay">
+      <summary>💳 พร้อมเพย์และบัญชีธนาคาร</summary>
+      <div class="grid">
+        <div class="field"><label>พร้อมเพย์ เบอร์มือถือ</label><input class="in" id="ppPhone" inputmode="numeric" placeholder="08xxxxxxxx"></div>
+        <div class="field"><label>พร้อมเพย์ เลขบัตรประชาชน</label><input class="in" id="ppTax" inputmode="numeric" placeholder="13 หลัก"></div>
+        <div class="field"><label>ชื่อบัญชีพร้อมเพย์</label><input class="in" id="ppName"></div>
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div class="field"><label>ธนาคาร</label><input class="in" id="bankName" list="bankList" placeholder="เช่น ธ.ก.ส."></div>
+        <div class="field"><label>เลขที่บัญชี</label><input class="in" id="bankNo" inputmode="numeric" placeholder="xxx-x-xxxxx-x"></div>
+        <div class="field"><label>ชื่อบัญชี</label><input class="in" id="bankAcc"></div>
+      </div>
+      <datalist id="bankList">
+        <option value="ธ.ก.ส."><option value="ธนาคารออมสิน"><option value="ธนาคารกรุงไทย"><option value="ธนาคารกสิกรไทย">
+        <option value="ธนาคารไทยพาณิชย์"><option value="ธนาคารกรุงเทพ"><option value="ธนาคารกรุงศรีอยุธยา"><option value="ธนาคารทหารไทยธนชาต (ttb)">
+        <option value="ธนาคารอาคารสงเคราะห์">
+      </datalist>
+    </details>
+    <details id="setSig">
+      <summary>✍️ ผู้ลงนามในใบเสร็จ</summary>
+      <div class="grid">
+        <div class="field"><label>ชื่อ-นามสกุล</label><input class="in" id="sigName"></div>
+        <div class="field"><label>ตำแหน่ง</label><input class="in" id="sigTitle"></div>
+      </div>
+      <div class="field" style="margin-top:12px"><label>ลายเซ็น (เซ็นปากกาสีเข้มบนกระดาษขาว แล้วถ่ายรูป ระบบลบพื้นหลังให้เอง)</label>
+        <div class="row" style="align-items:center;flex-wrap:wrap">
+          <img id="sigPrev" alt="ลายเซ็น">
+          <label class="btn ghost" for="sigFile">📷 เลือกรูปลายเซ็น</label>
+          <input type="file" id="sigFile" accept="image/*" hidden>
+          <button class="btn danger" id="sigClear">ลบลายเซ็น</button>
+        </div></div>
+    </details>
+    <div class="btn-row"><button class="btn ok" id="btnSave">💾 บันทึกการตั้งค่า</button></div>
+  </section>
 </div>
 <div id="pages"></div>
 
@@ -90,28 +116,30 @@ let ST = {}, BILLS = [], SIG = '';
   const { data, error } = await sb.from('settings').select('*').eq('id', 1).single();
   if (error) return toast('โหลดการตั้งค่าไม่ได้: ' + error.message, false);
   ST = data;
-  $('#ppPhone').value = ST.promptpay_phone || '';
-  $('#ppTax').value = ST.promptpay_tax_id || '';
+  $('#ppPhone').value = ST.promptpay_phone || ''; $('#ppTax').value = ST.promptpay_tax_id || '';
   $('#ppName').value = ST.promptpay_name || '';
-  $('#sigName').value = ST.signer_name || '';
-  $('#sigTitle').value = ST.signer_title || '';
+  $('#bankName').value = ST.bank_name || ''; $('#bankNo').value = ST.bank_account_no || ''; $('#bankAcc').value = ST.bank_account_name || '';
+  $('#sigName').value = ST.signer_name || ''; $('#sigTitle').value = ST.signer_title || '';
   SIG = ST.signature || ''; showSig();
-  const use = localStorage.getItem('ppUse') || (ST.promptpay_phone ? 'phone' : 'tax');
-  (document.querySelector(`input[name=ppUse][value=${use}]`) || document.querySelector('input[name=ppUse]')).checked = true;
+  const o = JSON.parse(localStorage.getItem('payOpts') || 'null')
+    || { phone: !!ST.promptpay_phone, tax: !ST.promptpay_phone && !!ST.promptpay_tax_id, bank: false };
+  $('#optPhone').checked = !!o.phone; $('#optTax').checked = !!o.tax; $('#optBank').checked = !!o.bank;
   $('#duplex').checked = localStorage.getItem('duplex') === '1';
-  $('#month').value = todayTH().slice(0, 7);
+  if (!ST.promptpay_phone && !ST.promptpay_tax_id && !ST.bank_account_no) $('#setPay').open = true;
+  if (!ST.signature) $('#setSig').open = true;
+  fillMonthPicker($('#mSel'), $('#ySel'));
   await loadBills();
 })();
 
 function showSig() { $('#sigPrev').src = SIG || ''; $('#sigPrev').style.display = SIG ? 'inline' : 'none'; }
 
 async function loadBills() {
-  const ym = $('#month').value; if (!ym) return;
+  const ym = pickerValue($('#mSel'), $('#ySel'));
   const [y, m] = ym.split('-').map(Number);
   const start = ym + '-01';
   const end = m === 12 ? (y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01';
   let q = sb.from('bills')
-    .select('id,bill_no,period,units,price_per_unit,service_fee,min_charge,amount,status,verify_code,households(house_no,owner_name),readings(prev_reading,curr_reading)')
+    .select('id,bill_no,period,units,price_per_unit,service_fee,amount,status,verify_code,households(house_no,owner_name,meter_no),readings(prev_reading,curr_reading)')
     .gte('period', start).lt('period', end).order('bill_no');
   if ($('#onlyUnpaid').checked) q = q.eq('status', 'unpaid');
   const { data, error } = await q;
@@ -119,81 +147,85 @@ async function loadBills() {
   BILLS = data || []; render();
 }
 
+function payOpts() {
+  const o = { phone: $('#optPhone').checked, tax: $('#optTax').checked, bank: $('#optBank').checked };
+  localStorage.setItem('payOpts', JSON.stringify(o)); return o;
+}
 function ppList() {
-  const use = document.querySelector('input[name=ppUse]:checked').value;
-  const L = [], ph = $('#ppPhone').value, tx = $('#ppTax').value;
-  if ((use === 'phone' || use === 'both') && validPhone(ph)) L.push({ id: ph, label: 'พร้อมเพย์ ' + fmtPhone(ph) });
-  if ((use === 'tax' || use === 'both') && validTaxId(tx)) L.push({ id: tx, label: 'พร้อมเพย์ ' + maskTax(tx) });
+  const o = payOpts(), L = [], ph = $('#ppPhone').value, tx = $('#ppTax').value;
+  if (o.phone && validPhone(ph)) L.push({ id: ph, label: 'พร้อมเพย์ ' + fmtPhone(ph) });
+  if (o.tax && validTaxId(tx)) L.push({ id: tx, label: 'พร้อมเพย์ ' + maskTax(tx) });
   return L;
 }
-const waterOf = b => Math.max(b.units * b.price_per_unit, Number(b.min_charge) || 0);
+function bankInfo() {
+  const no = $('#bankNo').value.trim();
+  return payOpts().bank && no ? { bank: $('#bankName').value.trim(), no, name: $('#bankAcc').value.trim() } : null;
+}
 
-function billCard(b, pps) {
-  const h = b.households || {}, r = b.readings || {};
-  const minUsed = (Number(b.min_charge) || 0) > b.units * b.price_per_unit;
+function header(title) {
+  return `<div class="hd"><div class="v">${esc(ST.village_name)}</div><div class="t">${title}</div></div>`;
+}
+function who(b) {
+  const h = b.households || {};
+  return `<div class="meta"><span>เลขที่ <b>${esc(b.bill_no)}</b></span><span>ประจำเดือน ${thMonth(b.period)}</span></div>
+    <div class="who"><b>${esc(h.owner_name || '-')}</b><br>บ้านเลขที่ ${esc(h.house_no || '-')} · มิเตอร์ ${esc(h.meter_no || '-')}</div>`;
+}
+
+function billCard(b, pps, bank) {
+  const r = b.readings || {};
   const qrs = pps.map(p => `<div>${qrImg(promptpayPayload(p.id, b.amount))}<div>${esc(p.label)}</div></div>`).join('');
-  return `<div class="card">
-    <div class="hd"><div class="v">${esc(ST.village_name)}</div><div class="t">ใบแจ้งค่าน้ำประปา</div></div>
-    <div class="meta"><span>เลขที่ <b>${esc(b.bill_no)}</b></span><span>ประจำเดือน ${thMonth(b.period)}</span></div>
-    <div>บ้านเลขที่ <b>${esc(h.house_no)}</b> ${esc(h.owner_name)}</div>
-    <table class="it">
+  const pay = (qrs ? `<div class="qrs ${pps.length > 1 ? 'two' : ''}">${qrs}</div><div>ชื่อบัญชี ${esc($('#ppName').value || '-')} · สแกนแล้วยอดเงินขึ้นเอง</div>` : '')
+    + (bank ? `<div class="bank">โอนเข้าบัญชี <b>${esc(bank.bank)}</b> เลขที่ <b>${esc(bank.no)}</b><br>ชื่อบัญชี ${esc(bank.name || '-')}</div>` : '')
+    || '<div style="color:#dc2626">ยังไม่ได้เลือกช่องทางชำระเงิน</div>';
+  return `<div class="slip">${header('ใบแจ้งค่าน้ำประปา')}${who(b)}
+    <table>
       <tr><td>เลขมิเตอร์ครั้งก่อน</td><td>${r.prev_reading ?? '-'}</td></tr>
       <tr><td>เลขมิเตอร์ครั้งนี้</td><td>${r.curr_reading ?? '-'}</td></tr>
       <tr><td>หน่วยที่ใช้</td><td>${b.units} หน่วย</td></tr>
-      <tr><td>ค่าน้ำ ${minUsed ? '(ค่าน้ำขั้นต่ำ)' : '(' + b.units + ' × ' + money(b.price_per_unit) + ')'}</td><td>${money(waterOf(b))}</td></tr>
+      <tr><td>ค่าน้ำ (${b.units} × ${money(b.price_per_unit)})</td><td>${money(b.units * b.price_per_unit)}</td></tr>
       <tr><td>ค่าบริการ</td><td>${money(b.service_fee)}</td></tr>
       <tr class="tot"><td>รวมเป็นเงิน</td><td>${money(b.amount)} บาท</td></tr>
     </table>
-    <div class="qrs ${pps.length > 1 ? 'two' : ''}">${qrs || '<div style="color:#dc2626">ยังไม่ได้ตั้งพร้อมเพย์</div>'}</div>
-    <div class="small">ชื่อบัญชี ${esc($('#ppName').value || '-')} · สแกนแล้วยอดเงินขึ้นอัตโนมัติ</div>
-  </div>`;
+    <div class="pay">${pay}</div></div>`;
 }
 
 function receiptCard(b) {
-  const h = b.households || {};
   const vurl = new URL('verify.html?c=' + b.verify_code, location.href).href;
-  return `<div class="card">
-    <div class="hd"><div class="v">${esc(ST.village_name)}</div><div class="t">ใบเสร็จรับเงินค่าน้ำประปา</div></div>
-    <div class="meta"><span>เลขที่ <b>${esc(b.bill_no)}</b></span><span>ประจำเดือน ${thMonth(b.period)}</span></div>
-    <div>ได้รับเงินจาก บ้านเลขที่ <b>${esc(h.house_no)}</b> ${esc(h.owner_name)}</div>
-    <table class="it">
-      <tr><td>ค่าน้ำประปา ${b.units} หน่วย</td><td>${money(waterOf(b))}</td></tr>
+  return `<div class="slip">${header('ใบเสร็จรับเงินค่าน้ำประปา')}${who(b)}
+    <table>
+      <tr><td>ค่าน้ำประปา ${b.units} หน่วย</td><td>${money(b.units * b.price_per_unit)}</td></tr>
       <tr><td>ค่าบริการ</td><td>${money(b.service_fee)}</td></tr>
       <tr class="tot"><td>รวมเป็นเงิน</td><td>${money(b.amount)} บาท</td></tr>
     </table>
     <div class="word">(${bahtText(b.amount)})</div>
-    <div style="margin-top:2mm">ชำระโดย ☐ เงินสด ☐ โอนพร้อมเพย์</div>
-    <div>วันที่รับเงิน ......../......../........</div>
-    <div style="margin-top:1mm">ลงชื่อผู้รับเงิน ......................................</div>
+    <div style="margin-top:1.5mm">ชำระโดย ☐ เงินสด ☐ โอน &nbsp; วันที่ ......../......../........</div>
     <div class="foot">
       <div style="text-align:center">${qrImg(vurl, 'vqr')}<div>สแกนตรวจสอบ</div></div>
       <div class="sig">${SIG ? `<img src="${SIG}" alt="">` : '<div style="height:13mm"></div>'}
         <div>(${esc($('#sigName').value)})</div><div>${esc($('#sigTitle').value)}</div></div>
-    </div>
-  </div>`;
+    </div></div>`;
 }
 
 function render() {
-  const pps = ppList(), duplex = $('#duplex').checked, empty = '<div class="card"></div>';
+  const pps = ppList(), bank = bankInfo(), duplex = $('#duplex').checked, empty = '<div class="slip"></div>';
   let html = '';
   for (let i = 0; i < BILLS.length; i += 4) {
     const g = BILLS.slice(i, i + 4);
-    const bc = g.map(b => billCard(b, pps)), rc = g.map(receiptCard);
+    const bc = g.map(b => billCard(b, pps, bank)), rc = g.map(receiptCard);
     while (bc.length < 4) { bc.push(empty); rc.push(empty); }
     html += `<div class="sheet">${bc.join('')}</div>`;
     html += `<div class="sheet">${(duplex ? [rc[1], rc[0], rc[3], rc[2]] : rc).join('')}</div>`;
   }
-  $('#pages').innerHTML = html || '<p class="no-print" style="text-align:center">ไม่มีบิลในเดือนนี้</p>';
-  const total = BILLS.reduce((a, b) => a + Number(b.amount), 0);
-  $('#sum').textContent = `${BILLS.length} บิล · ${Math.ceil(BILLS.length / 4) * 2} หน้า · รวม ${money(total)} บาท`;
+  $('#pages').innerHTML = html || '<p class="no-print muted" style="text-align:center">ไม่มีบิลในเดือนนี้</p>';
+  $('#kN').textContent = BILLS.length;
+  $('#kP').textContent = Math.ceil(BILLS.length / 4) * 2;
+  $('#kT').textContent = money(BILLS.reduce((a, b) => a + Number(b.amount), 0));
 }
 
-$('#btnLoad').onclick = loadBills;
-$('#onlyUnpaid').onchange = loadBills;
-$('#month').onchange = loadBills;
-document.querySelectorAll('input[name=ppUse]').forEach(r => r.onchange = () => { localStorage.setItem('ppUse', r.value); render(); });
+$('#mSel').onchange = loadBills; $('#ySel').onchange = loadBills; $('#onlyUnpaid').onchange = loadBills;
+['#optPhone', '#optTax', '#optBank'].forEach(s => $(s).onchange = render);
 $('#duplex').onchange = () => { localStorage.setItem('duplex', $('#duplex').checked ? '1' : '0'); render(); };
-['#ppPhone', '#ppTax', '#ppName', '#sigName', '#sigTitle'].forEach(s => $(s).onchange = render);
+['#ppPhone', '#ppTax', '#ppName', '#bankName', '#bankNo', '#bankAcc', '#sigName', '#sigTitle'].forEach(s => $(s).onchange = render);
 
 $('#sigFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -203,13 +235,11 @@ $('#sigFile').onchange = async e => {
   c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height);
   const d = x.getImageData(0, 0, c.width, c.height);
-  for (let i = 0; i < d.data.length; i += 4) {      // ลบพื้นหลังขาว
-    const y = 0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2];
-    if (y > 170) d.data[i + 3] = 0;
+  for (let i = 0; i < d.data.length; i += 4) {
+    if (0.299 * d.data[i] + 0.587 * d.data[i + 1] + 0.114 * d.data[i + 2] > 170) d.data[i + 3] = 0;
   }
   x.putImageData(d, 0, 0);
-  SIG = c.toDataURL('image/png'); showSig(); render();
-  e.target.value = '';
+  SIG = c.toDataURL('image/png'); showSig(); render(); e.target.value = '';
 };
 $('#sigClear').onclick = () => { SIG = ''; showSig(); render(); };
 
@@ -218,10 +248,10 @@ $('#btnSave').onclick = async () => {
   if (ph && !validPhone(ph)) return toast('เบอร์มือถือต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0', false);
   if (tx && !validTaxId(tx)) return toast('เลขบัตรประชาชนไม่ถูกต้อง (ตรวจหลักสุดท้ายไม่ผ่าน)', false);
   const { error } = await sb.from('settings').update({
-    promptpay_phone: ph || null, promptpay_tax_id: tx || null,
-    promptpay_name: $('#ppName').value.trim() || null,
-    signer_name: $('#sigName').value.trim(), signer_title: $('#sigTitle').value.trim(),
-    signature: SIG || null,
+    promptpay_phone: ph || null, promptpay_tax_id: tx || null, promptpay_name: $('#ppName').value.trim() || null,
+    bank_name: $('#bankName').value.trim() || null, bank_account_no: $('#bankNo').value.trim() || null,
+    bank_account_name: $('#bankAcc').value.trim() || null,
+    signer_name: $('#sigName').value.trim(), signer_title: $('#sigTitle').value.trim(), signature: SIG || null,
   }).eq('id', 1);
   if (error) return toast('บันทึกไม่สำเร็จ: ' + error.message, false);
   toast('บันทึกการตั้งค่าแล้ว'); render();
@@ -229,7 +259,7 @@ $('#btnSave').onclick = async () => {
 
 $('#btnPrint').onclick = () => {
   if (!BILLS.length) return toast('ไม่มีบิลให้พิมพ์', false);
-  if (!ppList().length && !confirm('ยังไม่มี QR พร้อมเพย์ที่ใช้ได้ พิมพ์ต่อไหม?')) return;
+  if (!ppList().length && !bankInfo() && !confirm('ยังไม่ได้เลือกช่องทางชำระเงิน พิมพ์ต่อไหม?')) return;
   window.print();
 };
 </script>
