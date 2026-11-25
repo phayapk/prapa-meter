@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ตรวจสอบใบเสร็จ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<style>
+  body{font-family:sans-serif;background:#f3f4f6;margin:0;padding:20px}
+  .box{max-width:420px;margin:auto;background:#fff;border-radius:14px;padding:20px;text-align:center;font-size:17px;line-height:1.6}
+  .ok{color:#16a34a}.no{color:#dc2626}
+</style>
+</head>
+<body>
+<div class="box" id="box">กำลังตรวจสอบ...</div>
+<script>
+(async () => {
+  const c = new URLSearchParams(location.search).get('c');
+  if (!c) { $('#box').textContent = 'ไม่พบรหัสใบเสร็จ'; return; }
+  const { data, error } = await sb.rpc('verify_receipt', { p_code: c });
+  const r = data && data[0];
+  if (error || !r) { $('#box').innerHTML = '<h2 class="no">❌ ไม่พบใบเสร็จนี้ในระบบ</h2>'; return; }
+  const paid = r.status === 'paid';
+  $('#box').innerHTML = `<h2 class="${paid ? 'ok' : 'no'}">${paid ? '✅ ชำระเงินแล้ว' : '⚠️ ยังไม่ได้ชำระเงิน'}</h2>
+    <p>เลขที่ <b>${esc(r.bill_no)}</b><br>บ้านเลขที่ ${esc(r.house_no)}<br>ประจำเดือน ${thMonth(r.period)}<br>
+    จำนวน <b>${money(r.amount)}</b> บาท</p>
+    ${paid ? `<p>รับเงินเมื่อ ${thDateTime(r.paid_at)}<br>${r.method === 'cash' ? 'เงินสด' : 'โอน'} · ผู้รับเงิน ${esc(r.received_name || '-')}</p>`
+           : '<p>ถ้าจ่ายเงินแล้วแต่ขึ้นข้อความนี้ กรุณาติดต่อกรรมการประปา</p>'}`;
+})();
+</script>
+</body>
+</html>
