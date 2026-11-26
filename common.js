@@ -122,3 +122,27 @@ function bankPayload(code, acc, amount) {
     + tlv('58', 'TH') + '6304';
   return p + crc16(p);
 }
+// ===== QR รับเงินจากแอปธนาคาร: ตรวจ แล้วใส่ยอดเงิน =====
+function parseTLV(s) {
+  const out = []; let i = 0; s = String(s || '');
+  while (i < s.length) {
+    const id = s.substr(i, 2), n = Number(s.substr(i + 2, 2));
+    if (!/^\d{2}$/.test(id) || !Number.isInteger(n) || i + 4 + n > s.length) return null;
+    out.push([id, s.substr(i + 4, n)]); i += 4 + n;
+  }
+  return out;
+}
+function isThaiQR(s) {
+  s = String(s || ''); const t = parseTLV(s); if (!t) return false;
+  const crc = t.find(x => x[0] === '63');
+  return !!crc && crc16(s.slice(0, -4)) === crc[1].toUpperCase() && t.some(x => x[0] === '58' && x[1] === 'TH');
+}
+function qrWithAmount(s, amount) {
+  const t = parseTLV(s); if (!t) return null;
+  const m = new Map(t.filter(x => x[0] !== '63'));
+  if (Number(amount) > 0) { m.set('01', '12'); m.set('54', Number(amount).toFixed(2)); }
+  const p = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => tlv(k, v)).join('') + '6304';
+  return p + crc16(p);
+}
+const qrName = s => ((parseTLV(s) || []).find(x => x[0] === '59') || [])[1] || '';
+const thDate = t => new Date(t).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });

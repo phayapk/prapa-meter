@@ -19,23 +19,7 @@
   td{padding:.6rem .75rem;border-top:1px solid #f1f5f9;font-size:.875rem;vertical-align:top}
   @media print{.no-print{display:none!important} body{background:#fff}}
 </style>
-<script>
-(function () {
-  var t = localStorage.getItem('adminTheme') ||
-          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  document.documentElement.dataset.theme = t;
-})();
-function toggleTheme() {
-  var d = document.documentElement;
-  d.dataset.theme = d.dataset.theme === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('adminTheme', d.dataset.theme); themeLabel();
-}
-function themeLabel() {
-  var b = document.getElementById('themeBtn');
-  if (b) b.textContent = document.documentElement.dataset.theme === 'dark' ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด';
-}
-document.addEventListener('DOMContentLoaded', themeLabel);
-</script>
+<script src="theme.js"></script>
 <style id="themeGold">
 :root{--g-bg:#f7f1e6;--g-card:#fffdf8;--g-ink:#2d2115;--g-mut:#7b6a52;--g-line:#e7dac2;--g-th:#f3e8d3;--g-pri:#8a5a19;--g-gold:#c9a227;--g-ok:#4d7c3a;--g-bad:#b4412f;--g-inp:#fff;--g-h1:#4a2f14;--g-h2:#8a5a19;--g-soft:rgba(201,162,39,.12)}
 [data-theme=dark]{color-scheme:dark;--g-bg:#15110c;--g-card:#211a12;--g-ink:#f1e6d2;--g-mut:#b5a386;--g-line:#3a2e20;--g-th:#2a2117;--g-pri:#c9973a;--g-gold:#e0bd5a;--g-ok:#6ea85a;--g-bad:#e06a55;--g-inp:#1a140e;--g-h1:#0f0b07;--g-h2:#3b2814;--g-soft:rgba(224,189,90,.10)}
@@ -85,7 +69,7 @@ td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
   <div class="min-h-screen flex items-center justify-center p-4">
     <form id="loginForm" class="card w-full max-w-sm space-y-3">
       <h1 class="text-xl font-bold text-center">⚙️ เข้าสู่ระบบหลังบ้าน</h1>
-      <input id="loginEmail" type="email" class="inp" placeholder="อีเมล" required>
+      <input id="loginEmail" type="text" class="inp" placeholder="ชื่อผู้ใช้ (เช่น somchai) หรืออีเมล" required>
       <input id="loginPass" type="password" class="inp" placeholder="รหัสผ่าน" required>
       <button class="btn bg-blue-600 text-white w-full">เข้าสู่ระบบ</button>
       <p id="loginMsg" class="text-sm text-red-600 text-center"></p>
@@ -232,11 +216,11 @@ td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
       <div class="card space-y-3">
         <h2 class="font-bold">➕ เพิ่มผู้ใช้งาน</h2>
         <div class="grid md:grid-cols-2 gap-3">
-          <input id="uEmail" type="email" class="inp" placeholder="อีเมล">
+          <input id="uEmail" type="text" class="inp" placeholder="ชื่อผู้ใช้ (เช่น somchai) หรืออีเมล">
           <input id="uName" class="inp" placeholder="ชื่อ-สกุล">
           <select id="uRole" class="inp">
-            <option value="staff">สตาฟ (จดมิเตอร์อย่างเดียว)</option>
-            <option value="admin">แอดมิน (เข้าหลังบ้านได้)</option>
+          <option value="staff">สตาฟ (จดมิเตอร์และรับเงิน)</option>
+          <option value="admin">แอดมิน (เข้าหลังบ้านได้)</option>
           </select>
           <input id="uPass" type="text" class="inp" placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัว) — เว้นว่างถ้ามีบัญชีแล้ว">
         </div>
@@ -299,6 +283,10 @@ td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
 <div id="toast" style="display:none"></div>
 
 <script>
+  const LOGIN_DOMAIN = 'prapa.local';
+const toLoginEmail = u => { u = String(u || '').trim().toLowerCase(); return u.includes('@') ? u : u + '@' + LOGIN_DOMAIN; };
+const showUser = e => String(e || '').replace('@' + LOGIN_DOMAIN, '');
+
 // ================== ตั้งค่า ==================
 const CONFIG = {
   SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',
@@ -749,8 +737,8 @@ function renderStaff() {
   const me = S.user.email.toLowerCase();
   $('staffBody').innerHTML = S.staff.map(u => {
     const self = u.email === me;
-    return `<tr>
-      <td>${esc(u.email)} ${self ? '<span class="text-xs text-blue-600">(คุณ)</span>' : ''}</td>
+        return `<tr>
+      <td>${esc(showUser(u.email))}${u.is_treasurer ? ' <span title="เหรัญญิก">💼</span>' : ''} ${self ? '<span class="text-xs text-blue-600">(คุณ)</span>' : ''}</td>
       <td>${esc(u.full_name || '-')}</td>
       <td><select class="inp" style="width:auto;padding:.25rem .5rem" ${self ? 'disabled' : ''}
             onchange="updStaff('${u.id}', {role:this.value})">
@@ -759,17 +747,35 @@ function renderStaff() {
         </select></td>
       <td><button ${self ? 'disabled' : ''} onclick="updStaff('${u.id}', {active:${!u.active}})"
             class="px-2 py-1 text-xs rounded-full ${u.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${u.active ? 'ใช้งาน' : 'ระงับ'}</button></td>
-      <td>${self ? '-' : `<button onclick="delStaff('${u.id}')" class="text-red-600 hover:underline">ลบ</button>`}</td>
+      <td><button class="btn bg-gray-200" onclick="resetPw('${u.id}')">🔑 ตั้งรหัสใหม่</button>
+          ${self ? '' : `<button class="btn bg-red-500" onclick="delStaff('${u.id}')">ลบ</button>`}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">ยังไม่มีผู้ใช้</td></tr>';
 }
 
+async function resetPw(id) {
+  const u = S.staff.find(x => String(x.id) === String(id)) || {};
+  const p = prompt('ตั้งรหัสผ่านใหม่ให้ ' + (u.full_name || '') + ' (' + showUser(u.email) + ')\nอย่างน้อย 6 ตัวอักษร');
+  if (p === null) return;
+  if (p.length < 6) return toast('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร', false);
+  const { error } = await sb.functions.invoke('create-staff', { body: { email: u.email, password: p } });
+  if (error) {
+    let d = ''; try { d = (await error.context.json()).error || ''; } catch (_) {}
+    return toast('ตั้งรหัสไม่สำเร็จ: ' + (d || error.message), false);
+  }
+  toast('ตั้งรหัสใหม่ให้ ' + showUser(u.email) + ' แล้ว');
+}
+
 async function addStaff() {
-  const email = $('uEmail').value.trim().toLowerCase();
+  let email = $('uEmail').value.trim().toLowerCase();
+  if (!email) return toast('กรุณากรอกชื่อผู้ใช้หรืออีเมล', false);
+  if (!email.includes('@') && !/^[a-z0-9._-]{3,30}$/.test(email)) return toast('ชื่อผู้ใช้ใช้ได้เฉพาะ a-z 0-9 . _ - ยาว 3–30 ตัว', false);
+  email = toLoginEmail(email);
+
   const full_name = $('uName').value.trim();
   const role = $('uRole').value;
   const pass = $('uPass').value;
-  if (!email) return toast('กรุณากรอกอีเมล', false);
+
 
   if (pass) {
     if (pass.length < 6) return toast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร', false);

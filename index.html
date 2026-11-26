@@ -97,6 +97,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
     <button class="hbtn" id="btnQueue">📤 รอส่ง<span id="qCount" class="badge hidden">0</span></button>
     <a class="hbtn" href="pay.html">💰 รับเงิน</a>
     <a class="hbtn hidden" id="lnkAdmin" href="admin.html">⚙️ แอดมิน</a>
+    <button class="hbtn" id="btnPw">🔑 รหัส</button>
     <button class="hbtn out" id="btnLogout">ออก</button>
   </nav>
 </header>
@@ -108,7 +109,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
       <h2 class="center" style="margin-top:0">💧 ระบบจดมิเตอร์ประปา</h2>
       <form id="loginForm">
         <label>อีเมล</label>
-        <input type="email" id="email" autocomplete="username" required>
+        <input type="text" placeholder="ชื่อผู้ใช้ หรืออีเมล" autocapitalize="none" autocorrect="off" spellcheck="false" id="email" autocomplete="username" required>
         <label>รหัสผ่าน</label>
         <input type="password" id="password" autocomplete="current-password" required>
         <button class="btn" id="btnLogin">เข้าสู่ระบบ</button>
@@ -196,6 +197,8 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
 
 <script>
 // ================== ตั้งค่า (แก้ตรงนี้) ==================
+const LOGIN_DOMAIN = 'prapa.local';
+const toLoginEmail = u => { u = String(u || '').trim().toLowerCase(); return u.includes('@') ? u : u + '@' + LOGIN_DOMAIN; };
 const CONFIG = {
   SUPABASE_URL: 'https://pfxygeegbxcdrgtaafyc.supabase.co',     // Project URL
   SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmeHlnZWVnYnhjZHJndGFhZnljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzMjQ5NDcsImV4cCI6MjEwODkwMDk0N30.kK-sZw_MB8DnH4YQUCUcmmLBL0fEGg2F0o9ke2tzkV0',  // ห้ามใช้ service_role
@@ -824,7 +827,7 @@ $('#btnLogout').addEventListener('click', async () => {
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const b = $('#btnLogin'); b.disabled = true; $('#loginErr').textContent = '';
-  const { error } = await sb.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
+  const { error } = await sb.auth.signInWithPassword({ email: toLoginEmail($('#email').value.trim()), password: $('#password').value });
   b.disabled = false;
   if (error) {
     $('#loginErr').textContent = /invalid/i.test(error.message) ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message;
@@ -853,6 +856,15 @@ async function start() {
   const { data } = await sb.auth.getSession();
   if (data.session) start(); else show('scrLogin');
 })();
+$('#btnPw').addEventListener('click', async () => {
+  if (!navigator.onLine) return alert('ต้องต่ออินเทอร์เน็ตก่อนเปลี่ยนรหัสผ่าน');
+  const p1 = prompt('ตั้งรหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)'); if (p1 === null) return;
+  if (p1.length < 6) return alert('รหัสผ่านต้องยาวอย่างน้อย 6 ตัวอักษร');
+  const p2 = prompt('พิมพ์รหัสผ่านใหม่อีกครั้ง'); if (p2 === null) return;
+  if (p1 !== p2) return alert('รหัสผ่าน 2 ครั้งไม่ตรงกัน');
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  alert(error ? 'เปลี่ยนไม่สำเร็จ: ' + error.message : '✅ เปลี่ยนรหัสผ่านแล้ว ครั้งหน้าใช้รหัสใหม่');
+});
 </script>
 </body>
 </html>

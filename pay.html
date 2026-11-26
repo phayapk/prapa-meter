@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="th">
 <head>
+  <script src="theme.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>รับเงินค่าน้ำ</title>
@@ -12,7 +13,7 @@
 <style>
   .item .top{display:flex;justify-content:space-between;gap:10px}
   .item.void{opacity:.55}.item.void .amt{text-decoration:line-through}
-  #qrImg img.qr{width:230px;height:230px;image-rendering:pixelated}
+#qrImg img.qr{width:230px;height:230px;image-rendering:pixelated;background:#fff;padding:10px;border-radius:12px}
   #q{margin-bottom:4px}
 </style>
 </head>
@@ -20,7 +21,7 @@
 <header class="topbar">
   <a class="btn light" id="back" href="index.html" style="justify-self:start">← กลับ</a>
   <h1>💰 รับเงินค่าน้ำ</h1>
-  <button class="btn light right" id="reload">⟳ รีเฟรช</button>
+  <div class="right"><button class="btn light" id="themeBtn" onclick="toggleTheme()">🌙 มืด</button><button class="btn light" id="reload">⟳ รีเฟรช</button></div>
 </header>
 <div class="seg"><button id="tUnpaid" class="on">ค้างชำระ <span id="cU"></span></button><button id="tToday">รับวันนี้</button></div>
 <main class="wrap">
@@ -97,7 +98,7 @@ function qrOptions() {
   const L = [];
   if (validPhone(ST.promptpay_phone)) L.push({ k: 'phone', t: 'เบอร์มือถือ', label: 'พร้อมเพย์ ' + fmtPhone(ST.promptpay_phone), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_phone, a) });
   if (validTaxId(ST.promptpay_tax_id)) L.push({ k: 'tax', t: 'เลขบัตรประชาชน', label: 'พร้อมเพย์ ' + maskTax(ST.promptpay_tax_id), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_tax_id, a) });
-  if (bankPayload(ST.bank_code, ST.bank_account_no, 1)) L.push({ k: 'bank', t: 'บัญชีธนาคาร', label: 'ธนาคาร' + bankLabel(ST.bank_code) + ' ' + ST.bank_account_no, name: ST.bank_account_name, make: a => bankPayload(ST.bank_code, ST.bank_account_no, a) });
+if (isThaiQR(ST.bank_qr)) L.push({ k: 'bank', t: 'บัญชีธนาคาร', label: (ST.bank_name ? 'ธนาคาร' + ST.bank_name + ' ' : '') + (ST.bank_account_no || ''), name: ST.bank_account_name || qrName(ST.bank_qr), make: a => qrWithAmount(ST.bank_qr, a) });
   return L;
 }
 function drawQR() {
