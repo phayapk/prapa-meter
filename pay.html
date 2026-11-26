@@ -1,35 +1,46 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <script src="theme.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>รับเงินค่าน้ำ</title>
+<script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="common.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script src="common.js"></script>
 <style>
+  .seg{grid-template-columns:repeat(3,1fr)}
+  .seg button{font-size:15px;padding:0 4px}
   .item .top{display:flex;justify-content:space-between;gap:10px}
   .item.void{opacity:.55}.item.void .amt{text-decoration:line-through}
-#qrImg img.qr{width:230px;height:230px;image-rendering:pixelated;background:#fff;padding:10px;border-radius:12px}
+  #qrImg img.qr{width:230px;height:230px;image-rendering:pixelated;background:#fff;padding:10px;border-radius:12px}
   #q{margin-bottom:4px}
+  .badge{display:inline-block;margin-top:4px;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:700}
+  .b-pending{background:#fef3c7;color:#92400e}.b-confirmed{background:#dcfce7;color:#166534}.b-rejected{background:#fee2e2;color:#991b1b}
+  .items{font-size:14px;margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+  .items div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
 </style>
 </head>
 <body>
 <header class="topbar">
   <a class="btn light" id="back" href="index.html" style="justify-self:start">← กลับ</a>
   <h1>💰 รับเงินค่าน้ำ</h1>
-  <div class="right"><button class="btn light" id="themeBtn" onclick="toggleTheme()">🌙 มืด</button><button class="btn light" id="reload">⟳ รีเฟรช</button></div>
+  <div class="right"><button class="btn light" id="themeBtn" onclick="toggleTheme()">🌙 มืด</button><button class="btn light" id="reload">⟳</button></div>
 </header>
-<div class="seg"><button id="tUnpaid" class="on">ค้างชำระ <span id="cU"></span></button><button id="tToday">รับวันนี้</button></div>
+<div class="seg">
+  <button id="tUnpaid" class="on">ค้างชำระ <span id="cU"></span></button>
+  <button id="tToday">รับวันนี้</button>
+  <button id="tCash">🤝 ส่งเงิน <span id="cC"></span></button>
+</div>
 <main class="wrap">
   <section id="sUnpaid">
     <input class="in" type="search" id="q" placeholder="🔍 ค้นชื่อ บ้านเลขที่ หรือเลขที่บิล" autocomplete="off">
     <div id="list"></div>
   </section>
   <section id="sToday" style="display:none"><div id="todaySum"></div><div id="todayList"></div></section>
+  <section id="sCash" style="display:none"><div id="cashBox"></div><div id="hoList"></div></section>
 </main>
 
 <div class="modal" id="qrBox"><div class="box">
@@ -37,34 +48,38 @@
   <div id="qrImg"></div>
   <button class="btn ghost" id="qrSw" style="margin-top:6px;display:none"></button>
   <div id="qrBank"></div>
-  <p style="color:#b45309;font-size:14px">ดูสลิปหรือตรวจในแอปธนาคารว่าเงินเข้าแล้ว ก่อนกดยืนยัน</p>
+  <p style="color:var(--warn);font-size:14px">ดูสลิปหรือตรวจในแอปธนาคารว่าเงินเข้าแล้ว ก่อนกดยืนยัน</p>
   <div class="btn-row"><button class="btn ghost" id="qrClose">ปิด</button><button class="btn ok" id="qrOk">✅ ได้รับเงินแล้ว</button></div>
 </div></div>
 
 <script>
-let ROLE = '', ST = {}, UNPAID = [], busy = false, qrBill = null, qrUse = 'phone', TAB = 'unpaid';
+let ROLE = '', ST = {}, UNPAID = [], busy = false, qrBill = null, qrUse = 'phone', TAB = 'unpaid', IS_TRES = false;
+const HO_TXT = { pending: 'รอเหรัญญิกยืนยัน', confirmed: 'เหรัญญิกรับแล้ว', rejected: 'เหรัญญิกไม่รับ' };
 
 (async () => {
   const r = await requireLogin(); ROLE = r.role;
   $('#back').href = homeHref(ROLE);
-  $('#back').textContent = ROLE === 'admin' ? '← หน้าแอดมิน' : '← หน้าจดมิเตอร์';
+  $('#back').textContent = ROLE === 'admin' ? '← แอดมิน' : '← หน้าจด';
   if (!['admin', 'staff', 'cashier'].includes(ROLE)) { $('main').innerHTML = '<div class="card">บัญชีนี้ไม่มีสิทธิ์รับเงิน</div>'; return; }
-  const { data } = await sb.from('settings').select('*').eq('id', 1).single();
-  ST = data || {};
-  qrUse = validPhone(ST.promptpay_phone) ? 'phone' : 'tax';
-  loadUnpaid();
+  const [s, t] = await Promise.all([sb.from('settings').select('*').eq('id', 1).single(), sb.rpc('is_treasurer')]);
+  ST = s.data || {}; IS_TRES = t.data === true;
+  if (IS_TRES) $('#tCash').innerHTML = '💼 เหรัญญิก <span id="cC"></span>';
+  loadUnpaid(); refreshCashBadge();
 })();
 
 function tab(t) {
   TAB = t;
-  $('#tUnpaid').classList.toggle('on', t === 'unpaid'); $('#tToday').classList.toggle('on', t === 'today');
-  $('#sUnpaid').style.display = t === 'unpaid' ? '' : 'none'; $('#sToday').style.display = t === 'today' ? '' : 'none';
-  t === 'unpaid' ? loadUnpaid() : loadToday();
+  [['unpaid', '#tUnpaid', '#sUnpaid'], ['today', '#tToday', '#sToday'], ['cash', '#tCash', '#sCash']].forEach(([k, b, s]) => {
+    $(b).classList.toggle('on', k === t); $(s).style.display = k === t ? '' : 'none';
+  });
+  if (t === 'unpaid') loadUnpaid(); else if (t === 'today') loadToday(); else loadCash();
 }
 $('#tUnpaid').onclick = () => tab('unpaid');
 $('#tToday').onclick = () => tab('today');
-$('#reload').onclick = () => tab(TAB);
+$('#tCash').onclick = () => tab('cash');
+$('#reload').onclick = () => { tab(TAB); refreshCashBadge(); };
 
+// ---------- ค้างชำระ ----------
 async function loadUnpaid() {
   if (!navigator.onLine) return toast('ไม่มีอินเทอร์เน็ต หน้ารับเงินต้องออนไลน์', false);
   const { data, error } = await sb.from('bills')
@@ -73,11 +88,10 @@ async function loadUnpaid() {
   if (error) return toast('โหลดไม่สำเร็จ: ' + error.message, false);
   UNPAID = data || []; $('#cU').textContent = UNPAID.length ? '(' + UNPAID.length + ')' : ''; renderUnpaid();
 }
-
 function renderUnpaid() {
   const k = $('#q').value.trim().toLowerCase();
   const L = UNPAID.filter(b => { const h = b.households || {};
-    return !k || [h.house_no, h.owner_name, b.bill_no].some(x => String(x || '').toLowerCase().includes(k)); });
+    return !k || [h.house_no, h.owner_name, b.bill_no, h.meter_no].some(x => String(x || '').toLowerCase().includes(k)); });
   $('#list').innerHTML = L.length ? L.map(b => { const h = b.households || {};
     return `<div class="card item"><div class="top"><div>
         <div class="nm">${esc(h.owner_name || '-')}</div>
@@ -98,7 +112,7 @@ function qrOptions() {
   const L = [];
   if (validPhone(ST.promptpay_phone)) L.push({ k: 'phone', t: 'เบอร์มือถือ', label: 'พร้อมเพย์ ' + fmtPhone(ST.promptpay_phone), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_phone, a) });
   if (validTaxId(ST.promptpay_tax_id)) L.push({ k: 'tax', t: 'เลขบัตรประชาชน', label: 'พร้อมเพย์ ' + maskTax(ST.promptpay_tax_id), name: ST.promptpay_name, make: a => promptpayPayload(ST.promptpay_tax_id, a) });
-if (isThaiQR(ST.bank_qr)) L.push({ k: 'bank', t: 'บัญชีธนาคาร', label: (ST.bank_name ? 'ธนาคาร' + ST.bank_name + ' ' : '') + (ST.bank_account_no || ''), name: ST.bank_account_name || qrName(ST.bank_qr), make: a => qrWithAmount(ST.bank_qr, a) });
+  if (isThaiQR(ST.bank_qr)) L.push({ k: 'bank', t: 'บัญชีธนาคาร', label: (ST.bank_name ? 'ธนาคาร' + ST.bank_name + ' ' : '') + (ST.bank_account_no || ''), name: ST.bank_account_name || qrName(ST.bank_qr), make: a => qrWithAmount(ST.bank_qr, a) });
   return L;
 }
 function drawQR() {
@@ -110,7 +124,7 @@ function drawQR() {
     <div class="amt" style="font-size:28px">${money(b.amount)} บาท</div>`;
   $('#qrImg').innerHTML = o
     ? qrImg(o.make(b.amount)) + `<div class="muted small">${esc(o.label)}<br>${esc(o.name || '')}</div>`
-    : '<p class="bad">ยังไม่ได้ตั้งช่องทางรับโอน (แอดมินตั้งได้ที่หน้าออกบิล)</p>';
+    : '<p class="bad">ยังไม่ได้ตั้งช่องทางรับโอน (แอดมินตั้งได้ที่หน้าบิล/ใบเสร็จ)</p>';
   $('#qrBank').innerHTML = '';
   $('#qrSw').style.display = L.length > 1 ? '' : 'none';
   if (L.length > 1) $('#qrSw').textContent = '🔁 สลับเป็น' + L[(i + 1) % L.length].t;
@@ -123,16 +137,17 @@ async function pay(id, method) {
   if (busy) return;
   const b = UNPAID.find(x => x.id === id); if (!b) return;
   const h = b.households || {};
-  if (!confirm(`ยืนยันรับเงิน${method === 'cash' ? 'สด' : 'โอน'}\n\n${h.owner_name || '-'}\nบ้านเลขที่ ${h.house_no || '-'}\nเลขที่ ${b.bill_no}\nจำนวน ${money(b.amount)} บาท`)) return;
+  if (!confirm(`ยืนยันรับเงิน${method === 'cash' ? 'สด' : 'โอน'}\n\n${h.owner_name || '-'}\nหมายเลขมิเตอร์ ${h.meter_no || '-'}\nเลขที่ ${b.bill_no}\nจำนวน ${money(b.amount)} บาท`)) return;
   busy = true;
   const { error } = await sb.rpc('receive_payment', { p_bill_id: id, p_method: method });
   busy = false;
   if (error) return toast('บันทึกไม่สำเร็จ: ' + error.message, false);
   $('#qrBox').style.display = 'none';
   alert(`✅ บันทึกรับเงินแล้ว\n\nยื่นใบเสร็จเลขที่ ${b.bill_no} ให้ ${h.owner_name || 'ลูกบ้าน'}`);
-  loadUnpaid();
+  loadUnpaid(); refreshCashBadge();
 }
 
+// ---------- รับวันนี้ ----------
 async function loadToday() {
   const start = new Date(todayTH() + 'T00:00:00+07:00').toISOString();
   const { data, error } = await sb.from('payments')
@@ -160,8 +175,101 @@ $('#todayList').onclick = async e => {
   const reason = prompt('เหตุผลที่ยกเลิก (ต้องใส่)'); if (!reason || !reason.trim()) return;
   const { error } = await sb.rpc('void_payment', { p_payment_id: +v.dataset.void, p_reason: reason.trim() });
   if (error) return toast('ยกเลิกไม่สำเร็จ: ' + error.message, false);
-  toast('ยกเลิกแล้ว บิลกลับเป็นค้างชำระ'); loadToday();
+  toast('ยกเลิกแล้ว บิลกลับเป็นค้างชำระ'); loadToday(); refreshCashBadge();
 };
+
+// ---------- ส่งมอบเงินสด ----------
+async function refreshCashBadge() {
+  let n = 0;
+  if (IS_TRES) {
+    const { count } = await sb.from('cash_handovers').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+    n = count || 0;
+  } else {
+    const { data } = await sb.rpc('my_cash');
+    n = data && data[0] ? Number(data[0].payment_count) : 0;
+  }
+  const c = $('#cC'); if (c) c.textContent = n ? '(' + n + ')' : '';
+}
+
+async function loadCash() {
+  const [mc, ho] = await Promise.all([
+    sb.rpc('my_cash'),
+    sb.from('cash_handovers').select('*').order('created_at', { ascending: false }).limit(30),
+  ]);
+  const err = mc.error || ho.error;
+  if (err) return toast('โหลดไม่สำเร็จ: ' + err.message, false);
+  const c = (mc.data && mc.data[0]) || { payment_count: 0, amount: 0 };
+  const L = ho.data || [], pend = L.filter(h => h.status === 'pending');
+  const total = A => A.reduce((s, h) => s + Number(h.amount), 0);
+
+  $('#cashBox').innerHTML = IS_TRES
+    ? `<div class="card"><h2>💼 เหรัญญิก</h2>
+        <div class="kpis" style="grid-template-columns:1fr 1fr">
+          <div><small>รอคุณยืนยัน ${pend.length} ครั้ง</small><b>${money(total(pend))}</b></div>
+          <div><small>เงินสดที่คุณรับเอง ${c.payment_count} ราย</small><b>${money(c.amount)}</b></div></div>
+        <p class="muted small">นับเงินให้ครบตามยอดก่อนกด "รับเงินครบแล้ว"</p></div>`
+    : `<div class="card"><h2>💵 เงินสดที่ถืออยู่ (ยังไม่ส่ง)</h2>
+        <div class="amt" style="font-size:34px;text-align:center">${money(c.amount)} บาท</div>
+        <div class="muted" style="text-align:center">${c.payment_count} รายการ</div>
+        <div class="btn-row"><button class="btn ok lg" id="btnHand" ${Number(c.payment_count) ? '' : 'disabled'}>🤝 ส่งเงินให้เหรัญญิก</button></div>
+        <p class="muted small">กดตอนยื่นเงินให้เหรัญญิก แล้วให้เหรัญญิกกดยืนยันในมือถือของตัวเอง</p></div>`;
+  const b = $('#btnHand'); if (b) b.onclick = () => handover(c);
+
+  $('#hoList').innerHTML = L.length
+    ? '<h2 style="margin:6px 0 10px;font-size:17px">ประวัติการส่งมอบ</h2>' + L.map(hoCard).join('')
+    : '<p class="muted" style="text-align:center">ยังไม่มีการส่งมอบ</p>';
+  refreshCashBadge();
+}
+
+function hoCard(h) {
+  const act = IS_TRES && h.status === 'pending';
+  return `<div class="card item"><div class="top"><div>
+      <div class="nm">${esc(h.from_name || '-')}</div>
+      <div class="muted small">ส่งเมื่อ ${thDateTime(h.created_at)} · ${h.payment_count} รายการ</div>
+      <span class="badge b-${h.status}">${HO_TXT[h.status]}</span>
+      ${h.decided_at ? `<div class="muted small">${h.status === 'confirmed' ? 'รับโดย' : 'ตรวจโดย'} ${esc(h.decided_name || '-')} · ${thDateTime(h.decided_at)}</div>` : ''}
+      ${h.note ? `<div class="small">หมายเหตุ: ${esc(h.note)}</div>` : ''}
+    </div><div class="amt">${money(h.amount)}</div></div>
+    <div class="items" id="it${h.id}" style="display:none"></div>
+    <div class="btn-row"><button class="btn ghost" data-items="${h.id}">📋 รายการ</button>
+      ${act ? `<button class="btn danger" data-rej="${h.id}">✗ ไม่รับ</button><button class="btn ok" data-acc="${h.id}">✅ รับครบแล้ว</button>` : ''}</div></div>`;
+}
+$('#hoList').onclick = e => {
+  const i = e.target.closest('[data-items]'), a = e.target.closest('[data-acc]'), r = e.target.closest('[data-rej]');
+  if (i) showItems(+i.dataset.items);
+  if (a) decide(+a.dataset.acc, true);
+  if (r) decide(+r.dataset.rej, false);
+};
+
+async function showItems(id) {
+  const box = $('#it' + id);
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const { data, error } = await sb.rpc('handover_items', { p_id: id });
+  if (error) return toast('โหลดรายการไม่สำเร็จ: ' + error.message, false);
+  box.innerHTML = data.length
+    ? data.map(x => `<div><span>${esc(x.receipt_no)} · ${esc(x.owner_name)}</span><b>${money(x.amount)}</b></div>`).join('')
+    : '<span class="muted">ไม่มีรายการ (คืนกลับให้ผู้ส่งแล้ว)</span>';
+  box.style.display = '';
+}
+
+async function handover(c) {
+  if (busy) return;
+  if (!confirm(`ส่งเงินสดให้เหรัญญิก\n\n${c.payment_count} รายการ\nรวม ${money(c.amount)} บาท\n\nนับเงินให้ตรงก่อนกด OK`)) return;
+  busy = true;
+  const { error } = await sb.rpc('create_handover', { p_note: null });
+  busy = false;
+  if (error) return toast('ส่งไม่สำเร็จ: ' + error.message, false);
+  toast('ส่งแล้ว รอเหรัญญิกยืนยัน'); loadCash();
+}
+
+async function decide(id, accept) {
+  let note = null;
+  if (accept) { if (!confirm('ยืนยันว่านับเงินครบตามยอดแล้ว?')) return; }
+  else { note = prompt('เหตุผลที่ไม่รับ (เช่น เงินขาด 20 บาท)'); if (!note || !note.trim()) return; }
+  const { error } = await sb.rpc('decide_handover', { p_id: id, p_accept: accept, p_note: note });
+  if (error) return toast('ไม่สำเร็จ: ' + error.message, false);
+  toast(accept ? 'รับเงินแล้ว' : 'ไม่รับ รายการคืนกลับให้ผู้ส่งแล้ว'); loadCash();
+}
 </script>
 </body>
 </html>

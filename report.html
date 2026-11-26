@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>รายงานค่าน้ำ</title>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="common.js"></script>
+<style>
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th,.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  .tbl th{background:var(--soft);color:var(--mut);white-space:nowrap}
+  .tbl .n{text-align:right;white-space:nowrap}
+  .tbl tfoot td{font-weight:700;border-top:2px solid var(--ink)}
+  .scroll{overflow-x:auto}
+  .ph{display:none}
+  @page{size:A4 landscape;margin:10mm}
+  @media print{
+    :root,[data-theme=dark]{--ink:#000;--mut:#333;--line:#bbb;--soft:#eee;--card:#fff;--pri:#000}
+    .topbar,.no-print{display:none!important}
+    .wrap{max-width:none;padding:0}
+    .card{border:0;box-shadow:none;padding:0;margin:0 0 6mm}
+    .card h2{font-size:13pt;margin-bottom:2mm}
+    .ph{display:block;text-align:center;margin-bottom:5mm;font-size:12pt}
+    .tbl{font-size:9.5pt}.tbl th,.tbl td{padding:1.2mm 2mm}
+    .tbl tr{break-inside:avoid}
+    .kpis div{border:1px solid #bbb}
+    .scroll{overflow:visible}
+  }
+</style>
+</head>
+<body>
+<header class="topbar no-print">
+  <a class="btn light" href="admin.html" style="justify-self:start">← แอดมิน</a>
+  <h1>📊 รายงาน</h1>
+  <div class="right"><button class="btn light" id="themeBtn" onclick="toggleTheme()">🌙 มืด</button></div>
+</header>
+<div class="wrap">
+  <section class="card no-print">
+    <div class="grid"><div class="field"><label>เดือน / ปี</label>
+      <div class="row"><select id="mSel" class="in"></select><select id="ySel" class="in"></select></div></div></div>
+    <div class="btn-row"><button class="btn" id="btnPdf">🖨️ พิมพ์ / บันทึก PDF</button><button class="btn ok" id="btnXls">📗 ดาวน์โหลด Excel</button></div>
+    <p class="muted small">PDF: ในหน้าต่างพิมพ์ ให้เลือกเครื่องพิมพ์เป็น "บันทึกเป็น PDF" (Save as PDF)</p>
+  </section>
+  <div class="ph"><b id="phV"></b><br>รายงานค่าน้ำประปา ประจำเดือน <span id="phM"></span><br><small>พิมพ์เมื่อ <span id="phT"></span></small></div>
+  <section class="card"><h2>1. สรุปประจำเดือน</h2><div id="sSum"></div></section>
+  <section class="card"><h2>2. รายละเอียดรายบ้าน</h2><div class="scroll" id="sDetail"></div></section>
+  <section class="card"><h2>3. ค้างชำระสะสม (ทุกเดือน)</h2><div class="scroll" id="sArr"></div></section>
+  <section class="card"><h2>4. เงินรับเข้าในเดือน (ตามวันที่รับเงิน)</h2><div class="scroll" id="sInc"></div></section>
+  <section class="card"><h2>5. เงินสดและการส่งมอบ</h2><div class="scroll" id="sCash"></div></section>
+</div>
+
+<script>
+let ST = {}, D = null;
+const methodTxt = m => m === 'cash' ? 'เงินสด' : m === 'transfer' ? 'โอน' : '-';
+const HO_TXT = { pending: 'รอเหรัญญิกยืนยัน', confirmed: 'เหรัญญิกรับแล้ว', rejected: 'เหรัญญิกไม่รับ' };
+const sumOf = (A, f) => A.reduce((s, x) => s + Number(f(x) || 0), 0);
+const activePay = b => (b.payments || []).filter(p => !p.voided_at)
+  .sort((a, c) => String(c.paid_at).localeCompare(String(a.paid_at)))[0] || null;
+
+(async () => {
+  const { role } = await requireLogin();
+  if (role !== 'admin') { document.body.innerHTML = '<p style="padding:20px">หน้านี้สำหรับแอดมินเท่านั้น</p>'; return; }
+  const { data } = await sb.from('settings').select('village_name').eq('id', 1).single();
+  ST = data || {};
+  fillMonthPicker($('#mSel'), $('#ySel'));
+  $('#mSel').onchange = load; $('#ySel').onchange = load;
+  load();
+})();
+
+function range(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const end = m === 12 ? (y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01';
+  return { start: ym + '-01', end,
+    tStart: new Date(ym + '-01T00:00:00+07:00').toISOString(),
+    tEnd: new Date(end + 'T00:00:00+07:00').toISOString() };
+}
+
+async function load() {
+  const ym = pickerValue($('#mSel'), $('#ySel')), r = range(ym);
+  const res = await Promise.all([
+    sb.from('bills').select('id,bill_no,period,units,amount,status,households(owner_name,meter_no),readings(prev_reading,curr_reading),payments(amount,method,paid_at,received_name,voided_at)')
+      .gte('period', r.start).lt('period', r.end).order('bill_no'),
+    sb.from('bills').select('bill_no,period,amount,household_id,households(owner_name,meter_no)').eq('status', 'unpaid').order('period'),
+    sb.from('payments').select('amount,method,paid_at,received_name,voided_at,void_reason,receipt_no,bills(period,households(owner_name))')
+      .gte('paid_at', r.tStart).lt('paid_at', r.tEnd).order('paid_at'),
+    sb.from('cash_handovers').select('*').gte('created_at', r.tStart).lt('created_at', r.tEnd).order('created_at'),
+    sb.rpc('cash_status'),
+    sb.from('staff').select('full_name,email').eq('is_treasurer', true).maybeSingle(),
+  ]);
+  const bad = res.find(x => x.error);
+  if (bad) return toast('โหลดรายงานไม่สำเร็จ: ' + bad.error.message, false);
+  const [bills, arr, pays, hos, cash, tres] = res.map(x => x.data);
+  D = { ym, bills: bills || [], arr: arr || [], pays: pays || [], hos: hos || [], cash: cash || [], tres };
+  render();
+}
+
+// ตาราง: mi = คอลัมน์เงิน, ni = คอลัมน์ตัวเลข (ชิดขวา)
+function tbl(head, rows, mi = [], ni = [], foot = null) {
+  const cell = (v, i, t = 'td') => {
+    const right = mi.includes(i) || ni.includes(i);
+    const s = v == null || v === '' ? (t === 'th' ? '' : '-')
+      : typeof v === 'number' ? (mi.includes(i) ? money(v) : String(v)) : esc(v);
+    return `<${t}${right ? ' class="n"' : ''}>${s}</${t}>`;
+  };
+  return `<table class="tbl"><thead><tr>${head.map((h, i) => cell(h, i, 'th')).join('')}</tr></thead><tbody>${
+    rows.length ? rows.map(r => `<tr>${r.map((v, i) => cell(v, i)).join('')}</tr>`).join('')
+      : `<tr><td colspan="${head.length}" class="muted">ไม่มีข้อมูล</td></tr>`}</tbody>${
+    foot ? `<tfoot><tr>${foot.map((v, i) => cell(v, i)).join('')}</tr></tfoot>` : ''}</table>`;
+}
+
+function render() {
+  const B = D.bills, paid = B.filter(b => b.status === 'paid'), unpaid = B.filter(b => b.status !== 'paid');
+  const billed = sumOf(B, b => b.amount), got = sumOf(paid, b => b.amount), owe = sumOf(unpaid, b => b.amount);
+  const units = sumOf(B, b => b.units), pct = billed ? Math.round(got * 100 / billed) : 0;
+  const okP = D.pays.filter(p => !p.voided_at);
+  const inCash = sumOf(okP.filter(p => p.method === 'cash'), p => p.amount);
+  const inTr = sumOf(okP.filter(p => p.method === 'transfer'), p => p.amount);
+
+  // ค้างสะสม แยกรายบ้าน
+  const g = new Map();
+  for (const b of D.arr) {
+    if (!g.has(b.household_id)) g.set(b.household_id, { h: b.households || {}, m: [], t: 0 });
+    const x = g.get(b.household_id); x.m.push(thMonth(b.period)); x.t += Number(b.amount);
+  }
+  const arrRows = [...g.values()].sort((a, c) => c.t - a.t)
+    .map((x, i) => [i + 1, x.h.owner_name || '-', x.h.meter_no || '-', x.m.length, x.m.join(', '), x.t]);
+  const arrTotal = sumOf(arrRows, r => r[5]);
+
+  const X = {};
+  X.sum = [
+    ['บ้านที่ออกบิล', B.length, 'บ้าน'], ['ปริมาณน้ำรวม', units, 'หน่วย (ลบ.ม.)'],
+    ['ยอดเรียกเก็บ', billed, 'บาท'],
+    ['ชำระแล้ว', paid.length, 'บ้าน'], ['ยอดที่ชำระแล้ว', got, 'บาท'],
+    ['ค้างชำระ', unpaid.length, 'บ้าน'], ['ยอดค้างชำระ', owe, 'บาท'],
+    ['อัตราการเก็บเงิน', pct, '%'],
+    ['เงินรับเข้าในเดือน: เงินสด', inCash, 'บาท'], ['เงินรับเข้าในเดือน: โอน', inTr, 'บาท'],
+    ['ค้างชำระสะสมทุกเดือน', arrTotal, 'บาท'],
+  ];
+  X.detailHead = ['#', 'เลขที่บิล', 'ชื่อ', 'หมายเลขมิเตอร์', 'ครั้งก่อน', 'ครั้งนี้', 'หน่วย', 'ยอด (บาท)', 'สถานะ', 'วันที่ชำระ', 'วิธี', 'ผู้รับเงิน'];
+  X.detail = B.map((b, i) => { const h = b.households || {}, rd = b.readings || {}, p = activePay(b);
+    return [i + 1, b.bill_no, h.owner_name || '-', h.meter_no || '-', rd.prev_reading ?? '', rd.curr_reading ?? '',
+      b.units, Number(b.amount), b.status === 'paid' ? 'ชำระแล้ว' : 'ค้างชำระ',
+      p ? thDate(p.paid_at) : '', p ? methodTxt(p.method) : '', p ? (p.received_name || '') : '']; });
+  X.detailFoot = ['', 'รวม', B.length + ' บ้าน', '', '', '', units, billed, '', '', '', ''];
+  X.arrHead = ['#', 'ชื่อ', 'หมายเลขมิเตอร์', 'จำนวนเดือน', 'เดือนที่ค้าง', 'ยอดค้าง (บาท)'];
+  X.arr = arrRows;
+  X.arrFoot = ['', 'รวม', arrRows.length + ' บ้าน', sumOf(arrRows, r => r[3]), '', arrTotal];
+  X.incHead = ['วันที่รับ', 'เลขที่ใบเสร็จ', 'ชื่อ', 'ค่าน้ำเดือน', 'วิธี', 'ผู้รับเงิน', 'จำนวน (บาท)', 'หมายเหตุ'];
+  X.inc = D.pays.map(p => { const bl = p.bills || {}, h = bl.households || {};
+    return [thDateTime(p.paid_at), p.receipt_no, h.owner_name || '-', bl.period ? thMonth(bl.period) : '-',
+      methodTxt(p.method), p.received_name || '-', Number(p.amount), p.voided_at ? 'ยกเลิก: ' + (p.void_reason || '') : '']; });
+  X.incFoot = ['', '', 'รวม (ไม่นับที่ยกเลิก)', '', `สด ${money(inCash)} / โอน ${money(inTr)}`, '', inCash + inTr, ''];
+  const tn = D.tres ? [D.tres.full_name, D.tres.email].filter(Boolean) : [];
+  X.cashHead = ['ผู้ถือเงิน', 'สถานะ', 'จำนวนรายการ', 'ยอด (บาท)'];
+  X.cash = D.cash.map(c => [c.holder,
+    c.kind === 'pending' ? 'รอเหรัญญิกยืนยัน' : tn.includes(c.holder) ? 'เหรัญญิกถือไว้ (รับเอง)' : 'ยังไม่ส่งเหรัญญิก',
+    Number(c.payment_count), Number(c.amount)]);
+  X.hoHead = ['วันที่ส่ง', 'ผู้ส่ง', 'จำนวนรายการ', 'ยอด (บาท)', 'สถานะ', 'ผู้ตรวจรับ', 'วันที่ตรวจรับ', 'หมายเหตุ'];
+  X.ho = D.hos.map(h => [thDateTime(h.created_at), h.from_name || '-', h.payment_count, Number(h.amount),
+    HO_TXT[h.status], h.decided_name || '', h.decided_at ? thDateTime(h.decided_at) : '', h.note || '']);
+  D.X = X;
+
+  $('#phV').textContent = ST.village_name || '';
+  $('#phM').textContent = thMonth(D.ym + '-01');
+  $('#phT').textContent = thDateTime(new Date());
+  $('#sSum').innerHTML = `<div class="kpis">
+      <div><small>ยอดเรียกเก็บ (บาท)</small><b>${money(billed)}</b></div>
+      <div><small>ชำระแล้ว (บาท)</small><b>${money(got)}</b></div>
+      <div><small>ค้างชำระ (บาท)</small><b>${money(owe)}</b></div></div>
+    <div class="kpis">
+      <div><small>บ้านที่ออกบิล</small><b>${B.length}</b></div>
+      <div><small>หน่วยรวม</small><b>${units}</b></div>
+      <div><small>เก็บได้</small><b>${pct}%</b></div></div>` + tbl(['รายการ', 'จำนวน', 'หน่วย'], X.sum, [1]);
+  $('#sDetail').innerHTML = tbl(X.detailHead, X.detail, [7], [0, 4, 5, 6], X.detailFoot);
+  $('#sArr').innerHTML = tbl(X.arrHead, X.arr, [5], [0, 3], X.arrFoot);
+  $('#sInc').innerHTML = tbl(X.incHead, X.inc, [6], [], X.incFoot);
+  $('#sCash').innerHTML = '<h3 style="margin:0 0 6px">เงินสดคงเหลือในมือ (ณ ตอนนี้)</h3>'
+    + tbl(X.cashHead, X.cash, [3], [2], ['รวม', '', sumOf(X.cash, r => r[2]), sumOf(X.cash, r => r[3])])
+    + '<h3 style="margin:14px 0 6px">การส่งมอบในเดือนนี้</h3>' + tbl(X.hoHead, X.ho, [3], [2]);
+}
+
+$('#btnPdf').onclick = () => {
+  if (!D) return;
+  const t = document.title; document.title = 'รายงานค่าน้ำ_' + D.ym;
+  window.print(); document.title = t;
+};
+
+$('#btnXls').onclick = () => {
+  if (!D || !D.X) return;
+  const X = D.X, wb = XLSX.utils.book_new(), title = [[ST.village_name || ''], ['รายงานค่าน้ำประปา ประจำเดือน ' + thMonth(D.ym + '-01')], []];
+  const add = (name, head, rows, foot, widths) => {
+    const ws = XLSX.utils.aoa_to_sheet([...title, head, ...rows, ...(foot ? [foot] : [])]);
+    ws['!cols'] = widths.map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  add('สรุป', ['รายการ', 'จำนวน', 'หน่วย'], X.sum, null, [32, 14, 14]);
+  add('รายบ้าน', X.detailHead, X.detail, X.detailFoot, [5, 14, 26, 16, 10, 10, 8, 12, 11, 14, 9, 20]);
+  add('ค้างชำระสะสม', X.arrHead, X.arr, X.arrFoot, [5, 26, 16, 11, 50, 14]);
+  add('เงินรับเข้า', X.incHead, X.inc, X.incFoot, [20, 16, 26, 18, 9, 20, 13, 30]);
+  add('เงินสดคงเหลือ', X.cashHead, X.cash, null, [26, 24, 14, 14]);
+  add('การส่งมอบ', X.hoHead, X.ho, null, [20, 24, 13, 13, 18, 20, 20, 30]);
+  XLSX.writeFile(wb, `รายงานค่าน้ำ_${D.ym}.xlsx`);
+};
+</script>
+</body>
+</html>

@@ -101,12 +101,13 @@ td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
         <h1 class="text-lg font-bold">⚙️ หลังบ้าน <span id="villageName" class="font-normal"></span></h1>
         <p id="whoami" class="text-xs text-blue-100"></p>
       </div>
-      <div class="flex gap-2">
-        <a href="index.html" class="btn bg-white/20 hover:bg-white/30">📱 หน้าจดมิเตอร์</a>
-<a href="bills.html" style="padding:8px 12px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none">🧾 ออกบิล/ใบเสร็จ</a>
-<a href="pay.html" style="padding:8px 12px;background:#0f766e;color:#fff;border-radius:8px;text-decoration:none">💰 รับเงิน</a>  
-<button type="button" id="themeBtn" onclick="toggleTheme()">🌙 โหมดมืด</button>      
-        <button onclick="logout()" class="btn bg-red-500 hover:bg-red-600">ออกจากระบบ</button>
+      <div class="flex flex-wrap gap-2">
+        <a href="index.html">📱 หน้าจด</a>
+        <a href="bills.html">🧾 บิล/ใบเสร็จ</a>
+        <a href="pay.html">💰 รับเงิน</a>
+        <a href="report.html">📊 รายงาน</a>
+        <button type="button" id="themeBtn" onclick="toggleTheme()">🌙 มืด</button>
+        <button onclick="logout()">ออกจากระบบ</button>
       </div>
     </div>
   </header>
@@ -213,6 +214,13 @@ td .btn{min-width:84px;min-height:36px;font-size:14px!important;margin:2px}
 
     <!-- TAB: ผู้ใช้งาน -->
     <section id="tab-user" class="hidden space-y-4">
+      <div class="card" style="margin-bottom:1rem">
+  <h3 class="font-bold mb-2">💼 เหรัญญิก (รับเงินสดที่สตาฟส่งมอบ)</h3>
+  <div class="flex flex-wrap gap-2 items-center">
+    <select id="tresSel" class="inp" style="width:auto;min-width:260px"></select>
+    <button class="btn bg-blue-600" onclick="saveTreasurer()">บันทึก</button>
+  </div>
+</div>
       <div class="card space-y-3">
         <h2 class="font-bold">➕ เพิ่มผู้ใช้งาน</h2>
         <div class="grid md:grid-cols-2 gap-3">
@@ -751,6 +759,7 @@ function renderStaff() {
           ${self ? '' : `<button class="btn bg-red-500" onclick="delStaff('${u.id}')">ลบ</button>`}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">ยังไม่มีผู้ใช้</td></tr>';
+  renderTreasurer();
 }
 
 async function resetPw(id) {
@@ -764,6 +773,19 @@ async function resetPw(id) {
     return toast('ตั้งรหัสไม่สำเร็จ: ' + (d || error.message), false);
   }
   toast('ตั้งรหัสใหม่ให้ ' + showUser(u.email) + ' แล้ว');
+}
+
+function renderTreasurer() {
+  $('tresSel').innerHTML = '<option value="">— ยังไม่กำหนด —</option>' +
+    S.staff.filter(u => u.active).map(u =>
+      `<option value="${esc(u.email)}" ${u.is_treasurer ? 'selected' : ''}>${esc(u.full_name || showUser(u.email))} (${esc(showUser(u.email))})</option>`
+    ).join('');
+}
+async function saveTreasurer() {
+  const { error } = await sb.rpc('set_treasurer', { p_email: $('tresSel').value || null });
+  if (error) return toast('บันทึกไม่สำเร็จ: ' + error.message, false);
+  toast('กำหนดเหรัญญิกแล้ว');
+  reloadAll();
 }
 
 async function addStaff() {
