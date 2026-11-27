@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>นำเงินฝากธนาคาร</title>
+<!-- ===== เริ่ม: ส่วนโหลดสคริปต์ (ลำดับเดียวกับ pay.html) ===== -->
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="common.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="common.js"></script>
+<!-- ===== จบ: ส่วนโหลดสคริปต์ ===== -->
+<style>
+.dp-wrap{max-width:760px;margin:0 auto;padding:12px}
+.dp-card{border:1px solid rgba(128,128,128,.35);border-radius:12px;padding:14px;margin:12px 0}
+.dp-big{font-size:2rem;font-weight:700}
+.dp-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dp-muted{opacity:.65}
+.dp-warn{color:#d35400;font-size:.95rem;margin-top:4px}
+.dp-table{width:100%;border-collapse:collapse}
+.dp-table th,.dp-table td{padding:6px 4px;border-bottom:1px solid rgba(128,128,128,.25);text-align:left;vertical-align:top}
+.dp-void td{opacity:.5;text-decoration:line-through}
+.dp-form label{display:block;margin-top:10px;font-weight:600}
+.dp-form input,.dp-form textarea{width:100%;box-sizing:border-box;padding:8px;font-size:1rem;margin-top:4px}
+.dp-btn{padding:6px 12px;border-radius:8px;border:1px solid rgba(128,128,128,.5);cursor:pointer;font-size:.95rem;background:transparent;color:inherit;margin:2px 0}
+.dp-btn-main{display:block;width:100%;margin-top:14px;padding:12px;background:#1e88e5;color:#fff;border:none;border-radius:8px;font-size:1.05rem;font-weight:700;cursor:pointer}
+.dp-btn-main:disabled{opacity:.5}
+#dpPreview{display:none;max-width:100%;max-height:320px;margin-top:8px;border-radius:8px}
+#dpOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:12px;cursor:pointer}
+#dpOverlay img{max-width:100%;max-height:100%;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="dp-wrap" id="dpApp">
+  <p><a href="javascript:history.back()">← ย้อนกลับ</a></p>
+  <h1>นำเงินสดฝากธนาคาร</h1>
+
+  <div class="dp-card">
+    <div>เงินสดที่ยืนยันรับแล้ว แต่ยังไม่ได้นำฝาก</div>
+    <div class="dp-big"><span id="dpCash">–</span> บาท</div>
+    <table class="dp-table">
+      <thead><tr>
+        <th><input type="checkbox" id="dpAll" checked></th>
+        <th>วันที่รับ</th><th>ผู้ส่งมอบ</th><th class="dp-num">ยอด</th>
+      </tr></thead>
+      <tbody id="dpList"><tr><td colspan="4" class="dp-muted">กำลังโหลด…</td></tr></tbody>
+    </table>
+    <p>ยอดที่เลือก: <b id="dpSel">0.00</b> บาท</p>
+  </div>
+
+  <div class="dp-card">
+    <form id="dpForm" class="dp-form">
+      <label>วันที่ฝาก <input type="date" id="dpDate" required></label>
+      <label>ยอดฝากตามสลิป (บาท) <input type="number" id="dpAmount" step="0.01" min="0.01" inputmode="decimal" required></label>
+      <div id="dpDiff" class="dp-warn"></div>
+      <label>ธนาคาร <input id="dpBank" placeholder="เช่น ธ.ก.ส. สาขา…"></label>
+      <label>เลขบัญชี <input id="dpAcct" inputmode="numeric"></label>
+      <label>รูปสลิป <input type="file" id="dpSlip" accept="image/*" required></label>
+      <img id="dpPreview" alt="ตัวอย่างสลิป">
+      <label>หมายเหตุ <textarea id="dpNote" rows="2" placeholder="จำเป็นต้องกรอก ถ้ายอดฝากไม่ตรงกับยอดที่เลือก"></textarea></label>
+      <button type="submit" id="dpSave" class="dp-btn-main">บันทึกการฝากเงิน</button>
+    </form>
+  </div>
+
+  <div class="dp-card">
+    <h2>ประวัติการฝาก (50 รายการล่าสุด)</h2>
+    <table class="dp-table">
+      <thead><tr><th>วันที่ฝาก</th><th class="dp-num">ยอด</th><th>รายละเอียด</th><th></th></tr></thead>
+      <tbody id="dpHist"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="dpOverlay" title="แตะเพื่อปิด"><img id="dpOverlayImg" alt="สลิป"></div>
+
+<script>
+(() => {
+  const el = id => document.getElementById(id);
+  const money = n => Number(n || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const safe = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const todayTH = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+  const thDate = d => d ? new Date(d).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '-';
+
+  let isAdmin = false, list = [], selSum = 0, slipBlob = null, amountTouched = false;
+
+  async function init() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { alert('กรุณาเข้าสู่ระบบก่อน'); location.href = 'index.html'; return; }
+
+    const [t, a] = await Promise.all([sb.rpc('is_treasurer'), sb.rpc('is_admin')]);
+    isAdmin = a.data === true;
+    if (!(t.data === true || isAdmin)) {
+      el('dpApp').innerHTML = '<div class="dp-card">หน้านี้สำหรับเหรัญญิกและผู้ดูแลระบบเท่านั้น<br><br><a href="javascript:history.back()">← ย้อนกลับ</a></div>';
+      return;
+    }
+
+    el('dpDate').value = todayTH();
+    el('dpDate').max = todayTH();
+    const s = await sb.from('settings').select('bank_name, bank_account_no').eq('id', 1).maybeSingle();
+    el('dpBank').value = localStorage.getItem('dp_bank') || s.data?.bank_name || '';
+    el('dpAcct').value = localStorage.getItem('dp_acct') || s.data?.bank_account_no || '';
+
+    await Promise.all([loadList(), loadHistory()]);
+  }
+
+  async function loadList() {
+    const { data, error } = await sb.rpc('undeposited_handovers');
+    if (error) { alert('โหลดรายการไม่สำเร็จ: ' + error.message); return; }
+    list = data || [];
+    el('dpList').innerHTML = list.length ? list.map(h => `
+      <tr>
+        <td><input type="checkbox" class="dp-ho" value="${h.id}" checked></td>
+        <td>${thDate(h.decided_at)}</td>
+        <td>${safe(h.from_name || '-')}<br><small class="dp-muted">${h.payment_count || 0} ใบเสร็จ</small></td>
+        <td class="dp-num">${money(h.amount)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4" class="dp-muted">ไม่มีเงินสดค้างฝาก</td></tr>';
+    el('dpAll').checked = true;
+    el('dpCash').textContent = money(list.reduce((s, h) => s + Number(h.amount), 0));
+    amountTouched = false;
+    recalc();
+  }
+
+  const selectedIds = () => [...document.querySelectorAll('.dp-ho:checked')].map(c => Number(c.value));
+
+  function recalc() {
+    const ids = new Set(selectedIds());
+    selSum = list.filter(h => ids.has(Number(h.id))).reduce((s, h) => s + Number(h.amount), 0);
+    el('dpSel').textContent = money(selSum);
+    if (!amountTouched) el('dpAmount').value = selSum ? selSum.toFixed(2) : '';
+    checkDiff();
+  }
+
+  function checkDiff() {
+    const diff = Number(el('dpAmount').value || 0) - selSum;
+    el('dpDiff').textContent = Math.abs(diff) > 0.004
+      ? `ยอดฝากต่างจากยอดที่เลือก ${money(diff)} บาท กรุณาระบุหมายเหตุ` : '';
+  }
+
+  async function shrink(file) {
+    try {
+      const bmp = await createImageBitmap(file);
+      const r = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+      return blob || file;
+    } catch { return file; }
+  }
+
+  el('dpList').addEventListener('change', recalc);
+  el('dpAll').addEventListener('change', e => {
+    document.querySelectorAll('.dp-ho').forEach(c => c.checked = e.target.checked);
+    recalc();
+  });
+  el('dpAmount').addEventListener('input', () => { amountTouched = true; checkDiff(); });
+  el('dpSlip').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    slipBlob = await shrink(f);
+    el('dpPreview').src = URL.createObjectURL(slipBlob);
+    el('dpPreview').style.display = 'block';
+  });
+
+  el('dpForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const ids = selectedIds();
+    const amount = Number(el('dpAmount').value);
+    const note = el('dpNote').value.trim();
+    if (!ids.length) return alert('กรุณาเลือกรายการเงินสดที่นำฝาก');
+    if (!slipBlob) return alert('กรุณาแนบรูปสลิป');
+    if (Math.abs(amount - selSum) > 0.004 && !note) return alert('ยอดฝากไม่ตรงกับยอดที่เลือก กรุณาระบุหมายเหตุ');
+    if (!confirm(`ยืนยันบันทึกการฝากเงิน ${money(amount)} บาท (${ids.length} รายการ)?`)) return;
+
+    const btn = el('dpSave');
+    btn.disabled = true; btn.textContent = 'กำลังบันทึก…';
+    try {
+      const d = el('dpDate').value;
+      const type = slipBlob.type || 'image/jpeg';
+      const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+      const path = `${d.slice(0, 7)}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+      const up = await sb.storage.from('deposit-slips').upload(path, slipBlob, { contentType: type });
+      if (up.error) throw up.error;
+
+      const { error } = await sb.rpc('create_bank_deposit', {
+        p_handover_ids: ids, p_amount: amount, p_deposit_date: d, p_slip_path: path,
+        p_bank_name: el('dpBank').value.trim() || null,
+        p_account_no: el('dpAcct').value.trim() || null,
+        p_note: note || null
+      });
+      if (error) throw error;
+
+      localStorage.setItem('dp_bank', el('dpBank').value.trim());
+      localStorage.setItem('dp_acct', el('dpAcct').value.trim());
+      alert('บันทึกการฝากเงินเรียบร้อย');
+      el('dpNote').value = ''; el('dpSlip').value = ''; slipBlob = null;
+      el('dpPreview').style.display = 'none';
+      await Promise.all([loadList(), loadHistory()]);
+    } catch (err) {
+      alert('บันทึกไม่สำเร็จ: ' + (err.message || err));
+    } finally {
+      btn.disabled = false; btn.textContent = 'บันทึกการฝากเงิน';
+    }
+  });
+
+  async function loadHistory() {
+    const { data, error } = await sb.from('bank_deposits')
+      .select('id, deposit_date, amount, expected_amount, handover_ids, bank_name, slip_path, note, status, void_reason, created_name')
+      .order('deposit_date', { ascending: false }).order('id', { ascending: false }).limit(50);
+    if (error) { alert('โหลดประวัติไม่สำเร็จ: ' + error.message); return; }
+    el('dpHist').innerHTML = (data || []).map(d => `
+      <tr class="${d.status === 'void' ? 'dp-void' : ''}">
+        <td>${thDate(d.deposit_date)}</td>
+        <td class="dp-num">${money(d.amount)}<br><small class="dp-muted">${(d.handover_ids || []).length} รายการ</small></td>
+        <td>${safe(d.bank_name || '')}
+            ${d.created_name ? `<br><small class="dp-muted">โดย ${safe(d.created_name)}</small>` : ''}
+            ${d.note ? `<br><small class="dp-muted">หมายเหตุ: ${safe(d.note)}</small>` : ''}
+            ${d.status === 'void' ? `<br><small>ยกเลิกแล้ว: ${safe(d.void_reason)}</small>` : ''}</td>
+        <td>
+          ${d.slip_path === 'opening-balance'
+            ? '<small class="dp-muted">ยอดยกมา</small>'
+            : `<button class="dp-btn" data-slip="${safe(d.slip_path)}">ดูสลิป</button>`}
+          ${isAdmin && d.status === 'recorded' ? `<br><button class="dp-btn" data-void="${d.id}">ยกเลิก</button>` : ''}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="4" class="dp-muted">ยังไม่มีรายการ</td></tr>';
+  }
+
+  el('dpHist').addEventListener('click', async e => {
+    const slip = e.target.dataset.slip, vid = e.target.dataset.void;
+    if (slip) {
+      const { data, error } = await sb.storage.from('deposit-slips').createSignedUrl(slip, 300);
+      if (error) return alert('เปิดสลิปไม่ได้: ' + error.message);
+      el('dpOverlayImg').src = data.signedUrl;
+      el('dpOverlay').style.display = 'flex';
+    }
+    if (vid) {
+      const reason = prompt('เหตุผลที่ยกเลิกรายการฝากนี้');
+      if (!reason) return;
+      const { error } = await sb.rpc('void_bank_deposit', { p_id: Number(vid), p_reason: reason });
+      if (error) return alert('ยกเลิกไม่สำเร็จ: ' + error.message);
+      await Promise.all([loadList(), loadHistory()]);
+    }
+  });
+
+  el('dpOverlay').addEventListener('click', () => {
+    el('dpOverlay').style.display = 'none';
+    el('dpOverlayImg').src = '';
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
