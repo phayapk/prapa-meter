@@ -37,12 +37,12 @@
   <h1>นำเงินสดฝากธนาคาร</h1>
 
   <div class="dp-card">
-    <div>เงินสดที่ยืนยันรับแล้ว แต่ยังไม่ได้นำฝาก</div>
+    <div>เงินสดที่ยังไม่ได้นำฝาก</div>
     <div class="dp-big"><span id="dpCash">–</span> บาท</div>
     <table class="dp-table">
       <thead><tr>
         <th><input type="checkbox" id="dpAll" checked></th>
-        <th>วันที่รับ</th><th>ผู้ส่งมอบ</th><th class="dp-num">ยอด</th>
+        <th>วันที่</th><th>ที่มา</th><th class="dp-num">ยอด</th>
       </tr></thead>
       <tbody id="dpList"><tr><td colspan="4" class="dp-muted">กำลังโหลด…</td></tr></tbody>
     </table>
@@ -105,14 +105,14 @@
   }
 
   async function loadList() {
-    const { data, error } = await sb.rpc('undeposited_handovers');
+    const { data, error } = await sb.rpc('undeposited_cash');
     if (error) { alert('โหลดรายการไม่สำเร็จ: ' + error.message); return; }
     list = data || [];
-    el('dpList').innerHTML = list.length ? list.map(h => `
+    el('dpList').innerHTML = list.length ? list.map((h, i) => `
       <tr>
-        <td><input type="checkbox" class="dp-ho" value="${h.id}" checked></td>
-        <td>${thDate(h.decided_at)}</td>
-        <td>${safe(h.from_name || '-')}<br><small class="dp-muted">${h.payment_count || 0} ใบเสร็จ</small></td>
+        <td><input type="checkbox" class="dp-ho" value="${i}" checked></td>
+        <td>${thDate(h.happened_at)}</td>
+        <td>${safe(h.label)}<br><small class="dp-muted">${h.kind === 'self' ? 'รับเงินเอง' : 'ส่งมอบ'} · ${h.item_count || 0} ใบเสร็จ</small></td>
         <td class="dp-num">${money(h.amount)}</td>
       </tr>`).join('')
       : '<tr><td colspan="4" class="dp-muted">ไม่มีเงินสดค้างฝาก</td></tr>';
@@ -122,11 +122,10 @@
     recalc();
   }
 
-  const selectedIds = () => [...document.querySelectorAll('.dp-ho:checked')].map(c => Number(c.value));
+  const selectedRows = () => [...document.querySelectorAll('.dp-ho:checked')].map(c => list[Number(c.value)]).filter(Boolean);
 
   function recalc() {
-    const ids = new Set(selectedIds());
-    selSum = list.filter(h => ids.has(Number(h.id))).reduce((s, h) => s + Number(h.amount), 0);
+    selSum = selectedRows().reduce((s, h) => s + Number(h.amount), 0);
     el('dpSel').textContent = money(selSum);
     if (!amountTouched) el('dpAmount').value = selSum ? selSum.toFixed(2) : '';
     checkDiff();
@@ -165,13 +164,15 @@
 
   el('dpForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const ids = selectedIds();
+    const rows = selectedRows();
+    const hIds = rows.filter(r => r.kind === 'handover').flatMap(r => (r.ref_ids || []).map(Number));
+    const pIds = rows.filter(r => r.kind === 'self').flatMap(r => (r.ref_ids || []).map(Number));
     const amount = Number(el('dpAmount').value);
     const note = el('dpNote').value.trim();
-    if (!ids.length) return alert('กรุณาเลือกรายการเงินสดที่นำฝาก');
+    if (!rows.length) return alert('กรุณาเลือกรายการเงินสดที่นำฝาก');
     if (!slipBlob) return alert('กรุณาแนบรูปสลิป');
     if (Math.abs(amount - selSum) > 0.004 && !note) return alert('ยอดฝากไม่ตรงกับยอดที่เลือก กรุณาระบุหมายเหตุ');
-    if (!confirm(`ยืนยันบันทึกการฝากเงิน ${money(amount)} บาท (${ids.length} รายการ)?`)) return;
+    if (!confirm(`ยืนยันบันทึกการฝากเงิน ${money(amount)} บาท (${rows.length} รายการ)?`)) return;
 
     const btn = el('dpSave');
     btn.disabled = true; btn.textContent = 'กำลังบันทึก…';
@@ -185,7 +186,8 @@
       if (up.error) throw up.error;
 
       const { error } = await sb.rpc('create_bank_deposit', {
-        p_handover_ids: ids, p_amount: amount, p_deposit_date: d, p_slip_path: path,
+        p_handover_ids: hIds, p_payment_ids: pIds,
+        p_amount: amount, p_deposit_date: d, p_slip_path: path,
         p_bank_name: el('dpBank').value.trim() || null,
         p_account_no: el('dpAcct').value.trim() || null,
         p_note: note || null
@@ -207,13 +209,18 @@
 
   async function loadHistory() {
     const { data, error } = await sb.from('bank_deposits')
-      .select('id, deposit_date, amount, expected_amount, handover_ids, bank_name, slip_path, note, status, void_reason, created_name')
+      .select('id, deposit_date, amount, expected_amount, handover_ids, payment_ids, bank_name, slip_path, note, status, void_reason, created_name')
       .order('deposit_date', { ascending: false }).order('id', { ascending: false }).limit(50);
     if (error) { alert('โหลดประวัติไม่สำเร็จ: ' + error.message); return; }
-    el('dpHist').innerHTML = (data || []).map(d => `
+    el('dpHist').innerHTML = (data || []).map(d => {
+      const nH = (d.handover_ids || []).length, nP = (d.payment_ids || []).length;
+      const parts = [];
+      if (nH) parts.push(nH + ' ส่งมอบ');
+      if (nP) parts.push(nP + ' ใบเสร็จรับเอง');
+      return `
       <tr class="${d.status === 'void' ? 'dp-void' : ''}">
         <td>${thDate(d.deposit_date)}</td>
-        <td class="dp-num">${money(d.amount)}<br><small class="dp-muted">${(d.handover_ids || []).length} รายการ</small></td>
+        <td class="dp-num">${money(d.amount)}<br><small class="dp-muted">${parts.join(', ')}</small></td>
         <td>${safe(d.bank_name || '')}
             ${d.created_name ? `<br><small class="dp-muted">โดย ${safe(d.created_name)}</small>` : ''}
             ${d.note ? `<br><small class="dp-muted">หมายเหตุ: ${safe(d.note)}</small>` : ''}
@@ -224,7 +231,8 @@
             : `<button class="dp-btn" data-slip="${safe(d.slip_path)}">ดูสลิป</button>`}
           ${isAdmin && d.status === 'recorded' ? `<br><button class="dp-btn" data-void="${d.id}">ยกเลิก</button>` : ''}
         </td>
-      </tr>`).join('') || '<tr><td colspan="4" class="dp-muted">ยังไม่มีรายการ</td></tr>';
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" class="dp-muted">ยังไม่มีรายการ</td></tr>';
   }
 
   el('dpHist').addEventListener('click', async e => {
