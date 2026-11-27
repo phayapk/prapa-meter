@@ -96,6 +96,7 @@ input,select{width:100%;padding:12px;font-size:17px;border:1px solid #c9d3de;bor
   <nav class="hnav">
     <button class="hbtn" id="btnQueue">📤 รอส่ง<span id="qCount" class="badge hidden">0</span></button>
     <a class="hbtn" href="pay.html">💰 รับเงิน</a>
+    <a class="hbtn hidden" id="lnkDeposit" href="deposit.html">🏦 ฝากเงิน</a>
     <a class="hbtn hidden" id="lnkAdmin" href="admin.html">⚙️ แอดมิน</a>
     <button class="hbtn" id="btnPw">🔑 รหัส</button>
     <button class="hbtn out" id="btnLogout">ออก</button>
@@ -271,6 +272,7 @@ function show(id) {
   if (!roleChecked) {
     roleChecked = true;
     sb.rpc('my_role').then(({ data }) => $('#lnkAdmin').classList.toggle('hidden', data !== 'admin'));
+    Promise.all([sb.rpc('is_treasurer'), sb.rpc('my_role')]).then(([t, r]) => $('#lnkDeposit').classList.toggle('hidden', !(t.data === true || r.data === 'admin')));
   }
 }
 // ปุ่มย้อนกลับของมือถือ
